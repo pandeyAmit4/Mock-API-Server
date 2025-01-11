@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mock API Admin Panel</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Mock API Admin Panel</h1>
+        
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="routes">Routes</button>
+            <button class="tab-btn" data-tab="storage">Storage</button>
+        </div>
+
+        <div id="routes" class="tab-content active">
+            <h2>Routes Configuration</h2>
+            <button id="addRoute">Add New Route</button>
+            <div id="routesList"></div>
+        </div>
+
+        <div id="storage" class="tab-content">
+            <h2>Storage Management</h2>
+            <div class="storage-actions">
+                <button onclick="resetStorage('/api/users')">Reset Users</button>
+                <button onclick="resetStorage('/api/products')">Reset Products</button>
+                <button onclick="resetStorage('/api/blog-posts')">Reset Blog Posts</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sticky-footer">
+        <span id="unsavedIndicator" class="unsaved-changes" style="display: none;">You have unsaved changes!</span>
+        <button id="saveRoutes" class="save-button">Save Changes</button>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

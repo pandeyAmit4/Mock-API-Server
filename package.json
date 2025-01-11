@@ -1,0 +1,36 @@
+{
+	"name": "mockflow",
+	"version": "1.0.0",
+	"type": "module",
+	"description": "A powerful and flexible mock API server with dynamic data generation and admin interface",
+	"main": "src/index.js",
+	"scripts": {
+		"start": "node src/index.js",
+		"dev": "nodemon src/index.js",
+		"test": "node src/tests/routes.test.js",
+		"test:watch": "nodemon src/tests/routes.test.js"
+	},
+	"dependencies": {
+		"@faker-js/faker": "^9.3.0",
+		"cors": "^2.8.5",
+		"express": "^4.18.2",
+		"http-status-codes": "^2.2.0"
+	},
+	"devDependencies": {
+		"nodemon": "^2.0.22"
+	},
+	"license": "MIT",
+	"author": "Amit Pandey <pandey.amitx@gmail.com>",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/amitpandey/mockflow"
+	},
+	"keywords": [
+		"mock-api",
+		"api-server",
+		"testing",
+		"development",
+		"faker",
+		"mock-data"
+	]
+}

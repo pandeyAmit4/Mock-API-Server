@@ -1,0 +1,19 @@
+{
+  "port": 3000,
+  "cors": {
+    "enabled": true,
+    "origins": "*",
+    "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    "allowHeaders": ["Content-Type", "Authorization"]
+  },
+  "delay": {
+    "enabled": true,
+    "default": 500,
+    "min": 0,
+    "max": 5000
+  },
+  "logging": {
+    "enabled": true,
+    "format": "[:timestamp] :method :url :status :response-time ms"
+  }
+}
