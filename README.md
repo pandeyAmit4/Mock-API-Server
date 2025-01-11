@@ -1,6 +1,6 @@
-# MockFlow
+# Mock API Server
 
-A powerful and flexible mock API server with dynamic data generation, built-in admin interface, and real-time configuration.
+A flexible and feature-rich mock API server for development and testing.
 
 ## Table of Contents
 - [Features](#features)
@@ -13,25 +13,48 @@ A powerful and flexible mock API server with dynamic data generation, built-in a
 - [Storage Management](#storage-management)
 - [Error Handling](#error-handling)
 - [Development Guide](#development-guide)
+- [API Documentation](#api-documentation)
+- [CLI Usage](#cli-usage)
 
 ## Features
 
 ### Core Features
-- 🚀 Dynamic route configuration
-- 🔄 Real-time route updates
-- 🎭 Faker.js integration for realistic mock data
-- 💾 In-memory data persistence
-- ⏱️ Configurable response delays
-- ✅ Schema validation
-- 🔍 Request logging
-- 🛡️ CORS support
+- Dynamic route configuration via JSON
+- Support for all HTTP methods (GET, POST, PUT, DELETE, PATCH)
+- Persistent data storage with automatic ID generation
+- Data validation with JSON schemas
+- Customizable response delays
+- CORS support
+- Detailed request logging
+
+### Dynamic Data Generation
+- Integration with Faker.js for realistic data
+- Template-based response generation
+- Support for nested objects and arrays
+- Custom field handlers for specific data types
+- Automatic ID generation for new items
+
+### Error Simulation
+- Configurable error responses
+- Probability-based error triggering
+- Custom error messages and status codes
+- Per-route error configuration
 
 ### Admin Interface
-- 📝 Visual route management
-- 🔄 Live route editing
-- 🗑️ Storage reset capabilities
-- 💡 JSON validation
-- ⚡ Immediate feedback
+- Visual route management
+- Real-time log viewer with filtering
+- Export logs functionality
+- Route validation
+- Unsaved changes warning
+- Storage reset capability
+
+### API Documentation
+- Interactive API documentation via Swagger UI
+- OpenAPI 3.0.0 specification
+- Automatic documentation generation from routes
+- Real-time API testing interface
+- Example response schemas
+- Error simulation documentation
 
 ## Quick Start
 
@@ -81,15 +104,36 @@ Full example with all available options:
   "path": "/api/users",          // Route path (supports parameters like :id)
   "method": "GET",              // HTTP method
   "response": {
-    "data": "{{faker.type.method}}"  // Dynamic data template
+    "users": [{
+      "id": "{{faker.string.uuid}}",
+      "name": "{{faker.person.fullName}}",
+      "email": "{{faker.internet.email}}"
+    }]
   },
   "persist": true,             // Enable in-memory storage
   "statusCode": 200,           // HTTP status code
   "delay": 1000,              // Response delay in milliseconds
   "schema": {                  // Validation schema for POST/PUT
     "name": "string",
-    "age": "number",
-    "active": "boolean"
+    "email": "string"
+  },
+  "error": {
+    "enabled": true,
+    "probability": 25,
+    "status": 503,
+    "message": "Service Temporarily Unavailable"
+  }
+}
+```
+
+### Error Simulation Configuration
+```json
+{
+  "error": {
+    "enabled": true,      // Enable/disable error simulation
+    "probability": 25,    // Percentage chance (0-100)
+    "status": 503,       // HTTP status code
+    "message": "Custom error message"
   }
 }
 ```
@@ -104,11 +148,25 @@ Full example with all available options:
    - Delete routes
    - Real-time JSON validation
    - Unsaved changes warning
+   - Duplicate route detection
+   - Error simulation configuration
+   - Auto-save warning
 
 2. Storage Management
    - Reset storage for specific endpoints
    - View current storage state
    - Manage persistence
+
+3. Log Viewer
+   - Real-time log updates
+   - Filter by:
+     - Status (success/error)
+     - HTTP method
+     - Time range (5m, 15m, 1h, 24h)
+     - Text search
+   - Expandable log details
+   - Export filtered logs
+   - Clear logs functionality
 
 ### Usage
 1. Access: `http://localhost:3000/admin`
@@ -122,6 +180,17 @@ Full example with all available options:
    - Use reset buttons to clear specific endpoint data
    - All operations are immediate
 
+4. Log Viewer:
+   - Real-time log updates
+   - Filter by:
+     - Status (success/error)
+     - HTTP method
+     - Time range (5m, 15m, 1h, 24h)
+     - Text search
+   - Expandable log details
+   - Export filtered logs
+   - Clear logs functionality
+
 ## API Reference
 
 ### Admin API Endpoints
@@ -130,6 +199,8 @@ GET    /admin              - Admin interface
 GET    /api/admin/routes   - Get routes configuration
 POST   /api/admin/routes   - Update routes configuration
 POST   /api/admin/reset/:path  - Reset storage for path
+GET    /api/admin/logs     - Get request logs
+DELETE /api/admin/logs     - Clear logs
 ```
 
 ### Dynamic Route Parameters
@@ -248,6 +319,101 @@ npm test
 # Watch mode
 npm run test:watch
 ```
+
+## CLI Usage
+
+Install globally:
+```bash
+npm install -g @yourusername/mock-api-server
+```
+
+Start server:
+```bash
+# Basic usage
+mock-server start
+
+# Custom config file
+mock-server start --config my-routes.json
+
+# Custom port
+mock-server start --port 8080
+
+# Verbose logging
+mock-server start --verbose
+
+# Reset in-memory data
+mock-server start --reset
+```
+
+### CLI Options
+
+| Option | Alias | Description | Default |
+|--------|-------|-------------|---------|
+| --config | -c | Routes configuration file | routes.json |
+| --port | -p | Port number | 3000 |
+| --verbose | -v | Enable verbose logging | false |
+| --reset | -r | Reset in-memory data | false |
+
+## API Documentation
+
+### Swagger UI
+Access the interactive API documentation at:
+```
+http://localhost:3000/docs
+```
+
+### OpenAPI Specification
+Raw OpenAPI spec available at:
+```
+http://localhost:3000/docs.json
+```
+
+### Features
+- Interactive API testing interface
+- Request/response schema documentation
+- Error simulation documentation
+- Path parameter documentation
+- Example values from Faker.js patterns
+- Response codes and error states
+- Authentication requirements (if configured)
+
+### Documentation Generation
+The OpenAPI specification is automatically generated from your routes configuration, including:
+- Path parameters
+- Query parameters
+- Request bodies
+- Response schemas
+- Error responses
+- Example values
+- Validation rules
+
+Example route with documentation:
+```json
+{
+  "path": "/api/users/:id",
+  "method": "GET",
+  "response": {
+    "id": "{{faker.string.uuid}}",
+    "name": "{{faker.person.fullName}}"
+  },
+  "persist": true,
+  "statusCode": 200,
+  "error": {
+    "enabled": true,
+    "probability": 25,
+    "status": 503,
+    "message": "Service Temporarily Unavailable"
+  }
+}
+```
+
+This route will generate documentation including:
+- Path parameter `:id`
+- Success response schema
+- Error response (503)
+- Example values from Faker.js
+- Response format
+
 
 ### Contributing
 1. Fork repository

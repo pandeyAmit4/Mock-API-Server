@@ -53,6 +53,17 @@ export async function loadRoutes(app) {
         app[method.toLowerCase()](routePath, async (req, res) => {
           console.log('Handling request for:', routeKey, 'params:', req.params);
           try {
+            // Check for error simulation first
+            if (route.error && route.error.enabled) {
+              const shouldError = Math.random() * 100 <= route.error.probability;
+              if (shouldError) {
+                return res.status(route.error.status).json({
+                  error: true,
+                  message: route.error.message
+                });
+              }
+            }
+
             // Apply route-specific delay
             await applyDelay(delay);
 

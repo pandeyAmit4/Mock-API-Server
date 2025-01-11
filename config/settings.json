@@ -14,6 +14,10 @@
   },
   "logging": {
     "enabled": true,
-    "format": "[:timestamp] :method :url :status :response-time ms"
+    "verbose": true,
+    "maxLogs": 1000,
+    "format": "[:timestamp] :method :url :status :response-time ms",
+    "logBody": true,
+    "logHeaders": true
   }
 }

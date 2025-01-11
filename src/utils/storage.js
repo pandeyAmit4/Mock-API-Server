@@ -121,4 +121,10 @@ export class StorageManager {
     }
     throw new Error('Preload data must be an array');
   }
+
+  static resetAll() {
+    storage.clear();
+    schemas.clear();
+    console.log('All storage and schemas reset');
+  }
 }

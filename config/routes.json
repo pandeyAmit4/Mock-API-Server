@@ -1,9 +1,24 @@
 [
   {
-    "path": "/api/new-route",
+    "path": "/api/userss",
     "method": "GET",
     "response": {
-      "message": "New route"
+      "users": []
+    },
+    "persist": true,
+    "statusCode": 200,
+    "error": {
+      "enabled": true,
+      "probability": 25,
+      "status": 503,
+      "message": "Service Temporarily Unavailable"
+    }
+  },
+  {
+    "path": "/api/stations",
+    "method": "GET",
+    "response": {
+      "message": "New station"
     },
     "persist": false,
     "statusCode": 200

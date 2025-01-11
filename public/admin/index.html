@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Mock API Admin Panel</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/js-toast-notifier@1.0.12/dist/index.css">
 </head>
 <body>
     <div class="container">
@@ -12,6 +13,7 @@
         <div class="tabs">
             <button class="tab-btn active" data-tab="routes">Routes</button>
             <button class="tab-btn" data-tab="storage">Storage</button>
+            <button class="tab-btn" data-tab="logs">Logs</button>
         </div>
 
         <div id="routes" class="tab-content active">
@@ -28,12 +30,48 @@
                 <button onclick="resetStorage('/api/blog-posts')">Reset Blog Posts</button>
             </div>
         </div>
+
+        <div id="logs" class="tab-content">
+            <h2>Request Logs</h2>
+            <div class="logs-controls">
+                <div class="logs-filter">
+                    <select id="statusFilter" class="logs-select">
+                        <option value="all">All Status</option>
+                        <option value="success">Success (2xx)</option>
+                        <option value="error">Error (4xx/5xx)</option>
+                    </select>
+                    <select id="methodFilter" class="logs-select">
+                        <option value="all">All Methods</option>
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                    <select id="timeFilter" class="logs-select">
+                        <option value="all">All Time</option>
+                        <option value="5m">Last 5 minutes</option>
+                        <option value="15m">Last 15 minutes</option>
+                        <option value="1h">Last hour</option>
+                        <option value="24h">Last 24 hours</option>
+                    </select>
+                </div>
+                <input type="text" id="logsSearch" placeholder="Search logs..." class="logs-search">
+            </div>
+            <div class="logs-actions">
+                <button onclick="clearLogs()">Clear Logs</button>
+                <button onclick="refreshLogs()">Refresh</button>
+                <button onclick="expandAllLogs()">Expand All</button>
+                <button onclick="collapseAllLogs()">Collapse All</button>
+                <button onclick="exportLogs()" class="export-btn">Export Logs</button>
+            </div>
+            <div id="logsList" class="logs-list"></div>
+        </div>
     </div>
 
     <div class="sticky-footer">
         <span id="unsavedIndicator" class="unsaved-changes" style="display: none;">You have unsaved changes!</span>
         <button id="saveRoutes" class="save-button">Save Changes</button>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/js-toast-notifier@1.0.12/dist/index.umd.js"></script>
     <script src="app.js"></script>
-</body>
-</html>
+</body></html>

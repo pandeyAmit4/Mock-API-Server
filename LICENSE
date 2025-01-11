@@ -1,6 +1,6 @@
 MIT License with Attribution
 
-Copyright (c) 2023 MockFlow by Amit Pandey
+Copyright (c) 2023 mock-api-server by Amit Pandey
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -16,7 +16,7 @@ furnished to do so, subject to the following conditions:
    - All copies or substantial portions of the Software must include the following
      attribution in the documentation and/or other materials provided with the
      distribution:
-     "This software includes MockFlow (https://github.com/pandeyAmit4/mockflow)
+     "This software includes mock-api-server (https://github.com/pandeyAmit4/mockflow)
      created by Amit Pandey"
    - The attribution must be clearly visible and not obscured.
 

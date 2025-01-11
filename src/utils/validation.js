@@ -19,4 +19,30 @@ export function validateRouteConfig(route) {
   if (route.delay && (!Number.isInteger(route.delay) || route.delay < 0)) {
     throw new Error('Delay must be a positive integer');
   }
+
+  // Validate error configuration if present
+  if (route.error) {
+    if (typeof route.error.enabled !== 'boolean') {
+      throw new Error('Error simulation enabled must be a boolean');
+    }
+
+    if (route.error.enabled) {
+      if (typeof route.error.probability !== 'number' || 
+          route.error.probability < 0 || 
+          route.error.probability > 100) {
+        throw new Error('Error probability must be between 0 and 100');
+      }
+
+      if (!route.error.status || 
+          !Number.isInteger(route.error.status) || 
+          route.error.status < 100 || 
+          route.error.status > 599) {
+        throw new Error('Invalid error status code');
+      }
+
+      if (!route.error.message || typeof route.error.message !== 'string') {
+        throw new Error('Error message must be a non-empty string');
+      }
+    }
+  }
 }
