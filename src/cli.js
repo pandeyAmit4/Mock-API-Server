@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#! /usr/bin/env node
 
 import { program } from 'commander';
 import path from 'path';
@@ -15,20 +15,33 @@ program
 
 program.command('start')
     .description('Start the mock API server')
-    .option('-c, --config <path>', 'Path to routes configuration file', 'routes.json')
+    .option('-c, --config <path>', 'Path to routes configuration file', './config/routes.json')
     .option('-p, --port <number>', 'Port number', '3000')
     .option('-v, --verbose', 'Enable verbose logging', false)
     .option('-r, --reset', 'Reset in-memory data on start', false)
     .action(async (options) => {
         try {
-            // Resolve config path
-            const configPath = path.resolve(process.cwd(), options.config);
+            // First try the provided path, then fallback to default locations
+            const possiblePaths = [
+                path.resolve(process.cwd(), options.config),
+                path.join(__dirname, '../config/routes.json'),
+                path.join(process.cwd(), 'config/routes.json')
+            ];
 
-            // Check if config file exists
-            try {
-                await fs.access(configPath);
-            } catch (error) {
-                console.error(`Error: Config file not found at ${configPath}`);
+            let configPath;
+            for (const p of possiblePaths) {
+                try {
+                    await fs.access(p);
+                    configPath = p;
+                    break;
+                } catch (e) {
+                    continue;
+                }
+            }
+
+            if (!configPath) {
+                console.error('Error: Could not find routes.json in any of these locations:');
+                possiblePaths.forEach(p => console.error(`- ${p}`));
                 process.exit(1);
             }
 

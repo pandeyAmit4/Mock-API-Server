@@ -1,29 +1,5 @@
 [
   {
-    "path": "/api/userss",
-    "method": "GET",
-    "response": {
-      "users": []
-    },
-    "persist": true,
-    "statusCode": 200,
-    "error": {
-      "enabled": true,
-      "probability": 25,
-      "status": 503,
-      "message": "Service Temporarily Unavailable"
-    }
-  },
-  {
-    "path": "/api/stations",
-    "method": "GET",
-    "response": {
-      "message": "New station"
-    },
-    "persist": false,
-    "statusCode": 200
-  },
-  {
     "path": "/api/users",
     "method": "GET",
     "response": {
@@ -33,26 +9,12 @@
           "firstName": "{{faker.person.firstName}}",
           "lastName": "{{faker.person.lastName}}",
           "email": "{{faker.internet.email}}",
-          "avatar": "{{faker.image.avatar}}",
-          "birthDate": "{{faker.date.birthdate}}",
-          "registeredAt": "{{faker.date.past}}",
-          "address": {
-            "street": "{{faker.location.street}}",
-            "city": "{{faker.location.city}}",
-            "state": "{{faker.location.state}}",
-            "zipCode": "{{faker.location.zipCode}}",
-            "country": "{{faker.location.country}}"
-          },
-          "company": {
-            "name": "{{faker.company.name}}",
-            "role": "{{faker.person.jobTitle}}"
-          }
+          "avatar": "{{faker.image.avatar}}"
         }
       ]
     },
     "persist": true,
-    "statusCode": 200,
-    "delay": 1000
+    "statusCode": 200
   },
   {
     "path": "/api/users/:id",
@@ -71,10 +33,18 @@
     "path": "/api/users",
     "method": "POST",
     "response": {
-      "message": "User created successfully"
+      "id": "{{faker.string.uuid}}",
+      "firstName": "{{faker.person.firstName}}",
+      "lastName": "{{faker.person.lastName}}",
+      "email": "{{faker.internet.email}}"
     },
     "persist": true,
-    "statusCode": 201
+    "statusCode": 201,
+    "schema": {
+      "firstName": "string",
+      "lastName": "string",
+      "email": "string"
+    }
   },
   {
     "path": "/api/users/:id",
@@ -83,9 +53,7 @@
       "id": "{{faker.string.uuid}}",
       "firstName": "{{faker.person.firstName}}",
       "lastName": "{{faker.person.lastName}}",
-      "email": "{{faker.internet.email}}",
-      "avatar": "{{faker.image.avatar}}",
-      "message": "User updated successfully"
+      "email": "{{faker.internet.email}}"
     },
     "persist": true,
     "statusCode": 200
@@ -93,9 +61,6 @@
   {
     "path": "/api/users/:id",
     "method": "DELETE",
-    "response": {
-      "message": "User deleted successfully"
-    },
     "persist": true,
     "statusCode": 204
   },
@@ -108,151 +73,119 @@
           "id": "{{faker.string.uuid}}",
           "name": "{{faker.commerce.productName}}",
           "price": "{{faker.commerce.price}}",
-          "description": "{{faker.commerce.productDescription}}",
           "category": "{{faker.commerce.department}}",
-          "image": "{{faker.image.url}}",
-          "inStock": "{{faker.datatype.boolean}}",
-          "rating": "{{faker.number.float({ min: 1, max: 5, precision: 0.1 })}}"
+          "details": {
+            "description": "{{faker.commerce.productDescription}}",
+            "material": "{{faker.commerce.productMaterial}}",
+            "manufacturer": "{{faker.company.name}}"
+          },
+          "stock": {
+            "quantity": "{{faker.number.int({ min: 0, max: 100 })}}",
+            "warehouse": "{{faker.location.city}}",
+            "reorderPoint": "{{faker.number.int({ min: 5, max: 20 })}}"
+          },
+          "ratings": {
+            "average": "{{faker.number.float({ min: 1, max: 5, precision: 0.1 })}}",
+            "count": "{{faker.number.int({ min: 0, max: 1000 })}}"
+          }
         }
       ]
-    },
-    "persist": true,
-    "statusCode": 200,
-    "delay": 1000
-  },
-  {
-    "path": "/api/products/:id",
-    "method": "GET",
-    "response": {
-      "id": "{{faker.string.uuid}}",
-      "name": "{{faker.commerce.productName}}",
-      "price": "{{faker.commerce.price}}",
-      "description": "{{faker.commerce.productDescription}}",
-      "category": "{{faker.commerce.department}}",
-      "image": "{{faker.image.url}}",
-      "inStock": "{{faker.datatype.boolean}}",
-      "rating": "{{faker.number.float({ min: 1, max: 5, precision: 0.1 })}}"
     },
     "persist": true,
     "statusCode": 200
   },
   {
-    "path": "/api/products",
-    "method": "POST",
-    "response": {
-      "message": "Product created successfully"
-    },
-    "persist": true,
-    "statusCode": 201,
-    "schema": {
-      "name": "string",
-      "price": "number",
-      "description": "string",
-      "inStock": "boolean"
-    }
-  },
-  {
-    "path": "/api/blog-posts",
+    "path": "/api/orders",
     "method": "GET",
     "response": {
-      "posts": [
+      "orders": [
         {
           "id": "{{faker.string.uuid}}",
-          "title": "{{faker.lorem.sentence}}",
-          "content": "{{faker.lorem.paragraphs}}",
-          "author": {
+          "orderDate": "{{faker.date.recent}}",
+          "status": "{{faker.helpers.arrayElement(['pending', 'processing', 'shipped', 'delivered'])}}",
+          "customer": {
             "id": "{{faker.string.uuid}}",
             "name": "{{faker.person.fullName}}",
-            "avatar": "{{faker.image.avatar}}"
+            "email": "{{faker.internet.email}}"
           },
-          "tags": [
-            "{{faker.lorem.word}}",
-            "{{faker.lorem.word}}",
-            "{{faker.lorem.word}}"
+          "items": [
+            {
+              "id": "{{faker.string.uuid}}",
+              "productId": "{{faker.string.uuid}}",
+              "name": "{{faker.commerce.productName}}",
+              "quantity": "{{faker.number.int({ min: 1, max: 5 })}}",
+              "price": "{{faker.commerce.price}}"
+            },
+            {
+              "id": "{{faker.string.uuid}}",
+              "productId": "{{faker.string.uuid}}",
+              "name": "{{faker.commerce.productName}}",
+              "quantity": "{{faker.number.int({ min: 1, max: 5 })}}",
+              "price": "{{faker.commerce.price}}"
+            }
           ],
-          "publishedAt": "{{faker.date.recent}}",
-          "readTime": "{{faker.number.int({ min: 1, max: 20 })}} min"
-        },
-        {
-          "id": "{{faker.string.uuid}}",
-          "title": "{{faker.lorem.sentence}}",
-          "content": "{{faker.lorem.paragraphs}}",
-          "author": {
-            "id": "{{faker.string.uuid}}",
-            "name": "{{faker.person.fullName}}",
-            "avatar": "{{faker.image.avatar}}"
+          "shipping": {
+            "address": "{{faker.location.streetAddress}}",
+            "city": "{{faker.location.city}}",
+            "country": "{{faker.location.country}}",
+            "trackingNumber": "{{faker.string.alphanumeric(10)}}"
           },
-          "tags": [
-            "{{faker.lorem.word}}",
-            "{{faker.lorem.word}}",
-            "{{faker.lorem.word}}"
-          ],
-          "publishedAt": "{{faker.date.recent}}",
-          "readTime": "{{faker.number.int({ min: 1, max: 20 })}} min"
-        },
-        {
-          "id": "{{faker.string.uuid}}",
-          "title": "{{faker.lorem.sentence}}",
-          "content": "{{faker.lorem.paragraphs}}",
-          "author": {
-            "id": "{{faker.string.uuid}}",
-            "name": "{{faker.person.fullName}}",
-            "avatar": "{{faker.image.avatar}}"
-          },
-          "tags": [
-            "{{faker.lorem.word}}",
-            "{{faker.lorem.word}}",
-            "{{faker.lorem.word}}"
-          ],
-          "publishedAt": "{{faker.date.recent}}",
-          "readTime": "{{faker.number.int({ min: 1, max: 20 })}} min"
-        },
-        {
-          "id": "{{faker.string.uuid}}",
-          "title": "{{faker.lorem.sentence}}",
-          "content": "{{faker.lorem.paragraphs}}",
-          "author": {
-            "id": "{{faker.string.uuid}}",
-            "name": "{{faker.person.fullName}}",
-            "avatar": "{{faker.image.avatar}}"
-          },
-          "tags": [
-            "{{faker.lorem.word}}",
-            "{{faker.lorem.word}}",
-            "{{faker.lorem.word}}"
-          ],
-          "publishedAt": "{{faker.date.recent}}",
-          "readTime": "{{faker.number.int({ min: 1, max: 20 })}} min"
-        },
-        {
-          "id": "{{faker.string.uuid}}",
-          "title": "{{faker.lorem.sentence}}",
-          "content": "{{faker.lorem.paragraphs}}",
-          "author": {
-            "id": "{{faker.string.uuid}}",
-            "name": "{{faker.person.fullName}}",
-            "avatar": "{{faker.image.avatar}}"
-          },
-          "tags": [
-            "{{faker.lorem.word}}",
-            "{{faker.lorem.word}}",
-            "{{faker.lorem.word}}"
-          ],
-          "publishedAt": "{{faker.date.recent}}",
-          "readTime": "{{faker.number.int({ min: 1, max: 20 })}} min"
+          "payment": {
+            "method": "{{faker.helpers.arrayElement(['credit_card', 'paypal', 'bank_transfer'])}}",
+            "status": "{{faker.helpers.arrayElement(['pending', 'completed', 'failed'])}}"
+          }
         }
       ]
     },
-    "statusCode": 200,
-    "delay": 1000,
-    "persist": true
+    "persist": true,
+    "statusCode": 200
   },
   {
-    "path": "/api/train-details",
+    "path": "/api/health",
     "method": "GET",
     "response": {
-      "trainName": "train 1",
-      "message": "New route"
+      "status": "healthy",
+      "timestamp": "{{faker.date.recent}}",
+      "version": "1.0.0"
+    },
+    "persist": false,
+    "statusCode": 200,
+    "error": {
+      "enabled": true,
+      "probability": 10,
+      "status": 503,
+      "message": "Service temporarily unavailable"
+    }
+  },
+  {
+    "path": "/api/slow-operation",
+    "method": "POST",
+    "response": {
+      "success": true,
+      "processingTime": "{{faker.number.int({ min: 1000, max: 5000 })}}",
+      "result": "Operation completed"
+    },
+    "persist": false,
+    "statusCode": 200,
+    "delay": 2000
+  },
+  {
+    "path": "/api/search",
+    "method": "GET",
+    "response": {
+      "results": [
+        {
+          "id": "{{faker.string.uuid}}",
+          "title": "{{faker.lorem.sentence}}",
+          "description": "{{faker.lorem.paragraph}}",
+          "category": "{{faker.helpers.arrayElement(['article', 'product', 'user'])}}"
+        }
+      ],
+      "metadata": {
+        "total": "{{faker.number.int({ min: 1, max: 100 })}}",
+        "page": 1,
+        "perPage": 10
+      }
     },
     "persist": false,
     "statusCode": 200

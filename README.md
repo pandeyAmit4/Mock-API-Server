@@ -414,6 +414,63 @@ This route will generate documentation including:
 - Example values from Faker.js
 - Response format
 
+## Plugin System
+
+### Using Plugins
+```javascript
+import { AuthPlugin } from 'mock-api-server/plugins/AuthPlugin';
+
+const server = await startServer({
+    port: 3000,
+    plugins: [
+        new AuthPlugin({ apiKey: 'your-api-key' })
+    ]
+});
+```
+
+### Creating Custom Plugins
+```javascript
+import { BasePlugin } from 'mock-api-server/plugins/BasePlugin';
+
+class LoggingPlugin extends BasePlugin {
+    constructor(options = {}) {
+        super('logging-plugin', options);
+        
+        this.hooks = {
+            beforeRequest: (req, res, next) => {
+                console.log(`${req.method} ${req.path}`);
+                next();
+            },
+            afterRequest: (req, res) => {
+                console.log(`Response sent: ${res.statusCode}`);
+            }
+        };
+    }
+}
+```
+
+### Available Hooks
+- `beforeRequest`: Before request processing
+- `afterRequest`: After response sent
+- `beforeResponse`: Before sending response
+- `onError`: On error handling
+- `onRouteLoad`: When routes are loaded
+- `customMiddleware`: Add custom Express middleware
+
+### Plugin Configuration
+```javascript
+{
+    name: 'plugin-name',    // Required
+    options: {},           // Plugin-specific options
+    hooks: {              // Optional hooks
+        beforeRequest: (req, res, next) => {},
+        afterRequest: (req, res) => {},
+        beforeResponse: (req, res, data) => {},
+        onError: (error, req, res) => {},
+        onRouteLoad: (route) => {}
+    }
+}
+```
 
 ### Contributing
 1. Fork repository
@@ -424,3 +481,112 @@ This route will generate documentation including:
 ## License
 
 MIT License
+
+## Recent Updates
+
+### Route Management
+- Improved route validation logic
+- Added support for multiple methods on same path
+- Validation only triggers on save
+- Centralized save button in sticky footer
+- Added sample routes loading feature
+
+### UI Improvements
+- Sticky footer with save button
+- Sample routes loading button
+- Better error handling and validation
+- Improved duplicate route detection
+
+### Route Configuration
+Example with all features:
+```json
+{
+  "path": "/api/example",
+  "method": "GET",
+  "response": { "message": "Example response" },
+  "persist": false,
+  "statusCode": 200,
+  "delay": 1000,
+  "error": {
+    "enabled": true,
+    "probability": 25,
+    "status": 503,
+    "message": "Service Unavailable"
+  },
+  "schema": {
+    "field": "type"
+  }
+}
+```
+
+### Route Validation Rules
+- Path must be unique per HTTP method
+- Same path can have different HTTP methods
+- Validation occurs only on save
+- All routes are validated before saving
+- Error simulation configuration is validated
+
+## Features Checklist
+
+### Core Features
+✅ Dynamic route configuration
+✅ CRUD operations
+✅ Persistent storage
+✅ Data validation
+✅ Error simulation
+✅ Request logging
+✅ OpenAPI documentation
+✅ Admin interface
+✅ CLI support
+
+### Data Generation
+✅ Faker.js integration
+✅ Custom field handlers
+✅ Nested object support
+✅ Array generation
+✅ Template-based responses
+
+### Storage Features
+✅ In-memory persistence
+✅ Automatic ID generation
+✅ Data validation
+✅ Reset capabilities
+✅ Batch operations
+
+### Error Handling
+✅ Configurable error rates
+✅ Custom error messages
+✅ Validation errors
+✅ Not found handling
+✅ Schema validation
+
+### Route Configuration Example
+```json
+{
+  "path": "/api/products",
+  "method": "GET",
+  "response": {
+    "products": [{
+      "id": "{{faker.string.uuid}}",
+      "name": "{{faker.commerce.productName}}",
+      "price": "{{faker.commerce.price}}",
+      "rating": "{{faker.number.float({ min: 1, max: 5, multipleOf: 0.1 })}}"
+    }]
+  },
+  "persist": true,
+  "schema": {
+    "name": "string",
+    "price": "number"
+  },
+  "statusCode": 200,
+  "delay": 1000
+}
+```
+
+### Validation Rules
+- All routes must have path and method
+- Persistent routes require proper schema
+- Error simulation needs probability and status
+- Path parameters require matching response fields
+- Proper typing for all schema fields
+- No duplicate route combinations

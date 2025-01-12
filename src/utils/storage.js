@@ -1,4 +1,5 @@
 import { SchemaValidator } from './schemaValidator.js';
+import { logger, LogLevel } from './logger.js';
 
 const storage = new Map();
 const schemas = new Map();
@@ -26,26 +27,47 @@ export class StorageManager {
     return this.getStore(path);
   }
 
+  static getStoreName(path) {
+    const parts = path.split('/');
+    return parts[parts.length - 1] + 's';
+  }
+
   static getStore(path) {
+    const storeName = this.getStoreName(path);
     if (!storage.has(path)) {
-      storage.set(path, []);
+      storage.set(path, { [storeName]: [] });
     }
     return storage.get(path);
   }
 
   static add(path, data) {
-    const validation = this.validateData(path, data);
-    if (!validation.isValid) {
-      throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
-    }
+    try {
+      const validation = this.validateData(path, data);
+      if (!validation.isValid) {
+        throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+      }
 
-    // Remove the :id from the path for storage
-    const basePath = path.replace(/\/:[^/]+$/, '');
-    const store = this.getStore(basePath);
-    const id = data.id || crypto.randomUUID();
-    const item = { ...data, id };
-    store.push(item);
-    return item;
+      const store = this.getStore(path);
+      const storeName = this.getStoreName(path);
+      
+      // Ensure store array exists
+      if (!store[storeName]) {
+        store[storeName] = [];
+      }
+      
+      // Ensure ID is present
+      if (!data.id) {
+        data.id = crypto.randomUUID();
+      }
+      
+      // Add the new item
+      store[storeName].push(data);
+      logger.debug(`Added item to ${path}`, { id: data.id });
+      return data;
+    } catch (error) {
+      logger.error(`Error adding item to ${path}:`, error);
+      throw error;
+    }
   }
 
   static update(path, id, data) {
@@ -54,58 +76,54 @@ export class StorageManager {
       throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
     }
 
-    // Remove the :id from the path for storage
-    const basePath = path.replace(/\/:[^/]+$/, '');
-    const store = this.getStore(basePath);
-    const index = store.findIndex(item => String(item.id) === String(id));
-    if (index === -1) return null;
+    const store = this.getStore(path);
+    const storeName = this.getStoreName(path);
+    const index = store[storeName].findIndex(item => item.id === id);
     
-    const originalId = store[index].id;
-    store[index] = { ...data, id: originalId };
-    return store[index];
+    if (index === -1) {
+      logger.warn(`Update failed: Item not found`, { path, id });
+      return null;
+    }
+
+    // Preserve the original ID
+    data.id = id;
+    store[storeName][index] = data;
+    logger.debug(`Updated item in ${path}`, { id });
+    return data;
   }
 
   static delete(path, id) {
-    // Remove the :id from the path for storage
-    const basePath = path.replace(/\/:[^/]+$/, '');
-    const store = this.getStore(basePath);
-    const index = store.findIndex(item => String(item.id) === String(id));
-    if (index === -1) return false;
+    const store = this.getStore(path);
+    const storeName = this.getStoreName(path);
+    const initialLength = store[storeName].length;
     
-    store.splice(index, 1);
-    return true;
+    store[storeName] = store[storeName].filter(item => item.id !== id);
+    
+    const deleted = store[storeName].length < initialLength;
+    if (deleted) {
+      logger.debug(`Deleted item from ${path}`, { id });
+    } else {
+      logger.warn(`Delete failed: Item not found`, { path, id });
+    }
+    
+    return deleted;
   }
 
   static getAll(path) {
-    const store = this.getStore(path);
-    // Handle different endpoints
-    switch (path) {
-      case '/api/users':
-        return { users: store };
-      case '/api/products':
-        return { products: store };
-      case '/api/blog-posts':
-        return { posts: store };
-      default:
-        return store;
-    }
+    return this.getStore(path);
   }
 
   static getById(path, id) {
     console.log(`Looking for item with ID ${id} in path ${path}`);
-    // Remove the :id from the path for storage lookup
-    const basePath = path.replace(/\/:[^/]+$/, '');
-    console.log('Base path for storage lookup:', basePath);
-    
-    const store = this.getStore(basePath);
-    // Convert both IDs to strings for comparison
-    const item = store.find(item => String(item.id) === String(id));
-    console.log('Found item:', item);
-    return item;
+    const store = this.getStore(path);
+    const storeName = this.getStoreName(path);
+    return store[storeName].find(item => item.id === id);
   }
 
   static reset(path, initialData = []) {
-    storage.set(path, [...initialData]);
+    const storeName = this.getStoreName(path);
+    storage.set(path, { [storeName]: [...initialData] });
+    logger.info(`Reset storage for ${path}`);
     return this.getStore(path);
   }
 
@@ -125,6 +143,6 @@ export class StorageManager {
   static resetAll() {
     storage.clear();
     schemas.clear();
-    console.log('All storage and schemas reset');
+    logger.info('Reset all storage');
   }
 }

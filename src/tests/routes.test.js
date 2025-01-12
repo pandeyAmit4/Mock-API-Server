@@ -1,6 +1,7 @@
 import { StorageManager } from '../utils/storage.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { generateDynamicData } from '../utils/dataGenerator.js';
+import { validateRouteConfig } from '../utils/validation.js';
 import assert from 'assert';
 
 async function runTests() {
@@ -135,6 +136,69 @@ async function runTests() {
     StorageManager.reset(testPath, initialData);
     const all = StorageManager.getAll(testPath);
     assert.strictEqual(all.length, 2);
+  });
+
+  // 5. Error Simulation Tests
+  console.log('\nRunning Error Simulation Tests...');
+
+  test('Should handle error simulation configuration', () => {
+    const route = {
+        path: '/api/error-test',
+        method: 'GET',
+        response: { message: 'Success' },
+        error: {
+            enabled: true,
+            probability: 50,
+            status: 503,
+            message: 'Test Error'
+        }
+    };
+    
+    // Verify route config is valid
+    assert.doesNotThrow(() => {
+        validateRouteConfig(route);
+    });
+    
+    // Test probability calculation
+    let errorCount = 0;
+    const iterations = 100;
+    
+    for (let i = 0; i < iterations; i++) {
+        const shouldError = Math.random() * 100 <= route.error.probability;
+        if (shouldError) errorCount++;
+    }
+
+    const errorRate = (errorCount / iterations) * 100;
+    assert.ok(errorRate > 30 && errorRate < 70, 
+        `Error rate ${errorRate}% is too far from expected 50%`);
+  });
+
+  test('Should validate error configuration', () => {
+    const invalidRoute = {
+        path: '/api/invalid-error',
+        method: 'GET',
+        response: { message: 'Success' },
+        error: {
+            enabled: true,
+            probability: 150, // Invalid: over 100
+            status: 503,
+            message: 'Test Error'
+        }
+    };
+    
+    let thrownError = null;
+    try {
+        validateRouteConfig(invalidRoute);
+    } catch (error) {
+        thrownError = error;
+    }
+
+    assert.ok(thrownError, 'Expected validation to throw an error');
+    assert.strictEqual(
+        thrownError.message,
+        'Error probability must be between 0 and 100',
+        'Incorrect error message'
+    );
   });
 
   // Test Summary

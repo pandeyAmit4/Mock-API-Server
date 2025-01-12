@@ -3,21 +3,26 @@
   "cors": {
     "enabled": true,
     "origins": "*",
-    "methods": ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    "allowHeaders": ["Content-Type", "Authorization"]
+    "methods": [
+      "GET",
+      "POST",
+      "PUT",
+      "DELETE",
+      "PATCH"
+    ],
+    "allowHeaders": [
+      "Content-Type",
+      "Authorization"
+    ]
   },
   "delay": {
     "enabled": true,
-    "default": 500,
+    "default": 0,
     "min": 0,
     "max": 5000
   },
   "logging": {
     "enabled": true,
-    "verbose": true,
-    "maxLogs": 1000,
-    "format": "[:timestamp] :method :url :status :response-time ms",
-    "logBody": true,
-    "logHeaders": true
+    "format": "[:timestamp] :method :url :status :response-time ms"
   }
 }

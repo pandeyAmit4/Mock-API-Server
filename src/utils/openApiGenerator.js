@@ -1,7 +1,6 @@
 import { getSettings } from './settings.js';
 
-export function generateOpenApiSpec(routes) {
-    const settings = getSettings();
+export function generateOpenApiSpec(routes, options = {}) {
     const spec = {
         openapi: '3.0.0',
         info: {
@@ -10,7 +9,7 @@ export function generateOpenApiSpec(routes) {
             description: 'Automatically generated API documentation from routes configuration'
         },
         servers: [{
-            url: `http://localhost:${settings.port}`,
+            url: `http://localhost:${options.port || 3000}`,
             description: 'Mock API Server'
         }],
         paths: {},

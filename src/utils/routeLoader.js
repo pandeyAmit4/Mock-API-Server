@@ -8,165 +8,214 @@ import { applyDelay } from './delay.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+export async function loadRoutes(app, routesConfig) {
+    try {
+        // Add route count validation
+        if (!Array.isArray(routesConfig) || routesConfig.length === 0) {
+            console.warn('No routes configured');
+            return;
+        }
 
-export async function loadRoutes(app) {
-  try {
-    const configPath = path.join(__dirname, '../../config/routes.json');
-    console.log('Loading routes from:', configPath);
-    
-    const routesConfig = JSON.parse(await fs.readFile(configPath, 'utf8'));
-    console.log('Found routes:', routesConfig.length);
-    
-    const usedPaths = new Set();
+        // Track route metrics
+        const metrics = {
+            total: routesConfig.length,
+            loaded: 0,
+            failed: 0,
+            duplicates: 0
+        };
 
-    for (const route of routesConfig) {
-      try {
-        console.log('Processing route:', route.path, route.method);
-        validateRouteConfig(route);
+        console.log('Loading routes from configuration');
         
-        const { 
-          path: routePath, 
-          method, 
-          response, 
-          statusCode = 200, 
-          delay = 0, 
-          persist = false,
-          schema,
-          modify 
-        } = route;
-        const routeKey = `${method.toUpperCase()}:${routePath}`;
-
-        if (usedPaths.has(routeKey)) {
-          console.warn(`Duplicate route found: ${routeKey}. Skipping...`);
-          continue;
+        if (!Array.isArray(routesConfig)) {
+            throw new Error('Routes configuration must be an array');
         }
+        
+        console.log('Found routes:', routesConfig.length);
+        const registeredRoutes = new Set();
 
-        usedPaths.add(routeKey);
-        console.log('Registering route handler for:', routeKey);
-
-        // Register schema if provided
-        if (schema) {
-          StorageManager.setSchema(routePath, schema);
-        }
-
-        app[method.toLowerCase()](routePath, async (req, res) => {
-          console.log('Handling request for:', routeKey, 'params:', req.params);
-          try {
-            // Check for error simulation first
-            if (route.error && route.error.enabled) {
-              const shouldError = Math.random() * 100 <= route.error.probability;
-              if (shouldError) {
-                return res.status(route.error.status).json({
-                  error: true,
-                  message: route.error.message
+        for (const route of routesConfig) {
+            try {
+                // Ensure path starts with /
+                const path = route.path.startsWith('/') ? route.path : `/${route.path}`;
+                console.log('\nProcessing route:', {
+                    path: path,
+                    method: route.method,
+                    persist: route.persist,
+                    hasResponse: !!route.response,
+                    hasSchema: !!route.schema
                 });
-              }
-            }
+                
+                validateRouteConfig(route);
+                
+                const routeKey = `${route.method.toUpperCase()}:${path}`;
+                if (registeredRoutes.has(routeKey)) {
+                    console.warn(`Skipping duplicate route: ${routeKey}`);
+                    metrics.duplicates++;
+                    continue;
+                }
 
-            // Apply route-specific delay
-            await applyDelay(delay);
+                registeredRoutes.add(routeKey);
 
-            let responseData = response;
+                // Register route handler with normalized path
+                app[route.method.toLowerCase()](path, async (req, res) => {
+                    try {
+                        // Handle error simulation
+                        if (route.error?.enabled) {
+                            const shouldError = Math.random() * 100 <= route.error.probability;
+                            if (shouldError) {
+                                return res.status(route.error.status).json({
+                                    error: true,
+                                    message: route.error.message
+                                });
+                            }
+                        }
 
-            if (persist) {
-              // Get the base path without parameters for storage
-              const basePath = routePath.split(':')[0].replace(/\/$/, '');
-              console.log('Base path for storage:', basePath);
+                        // Apply delay if specified
+                        if (route.delay) {
+                            await new Promise(resolve => setTimeout(resolve, route.delay));
+                        }
 
-              switch (method.toUpperCase()) {
-                case 'GET':
-                  if (req.params.id) {
-                    const item = StorageManager.getById(basePath, req.params.id);
-                    console.log('Found item:', item);
-                    if (!item) {
-                      return res.status(404).json({ 
-                        error: 'Not found',
-                        message: `No item found with id: ${req.params.id}`
-                      });
+                        let responseData;
+                        // Normalize base path for storage
+                        const basePath = path.split(':')[0].replace(/\/$/, '');
+
+                        if (route.persist) {
+                            switch (route.method.toUpperCase()) {
+                                case 'GET':
+                                    if (req.params.id) {
+                                        responseData = StorageManager.getById(basePath, req.params.id);
+                                        if (!responseData) {
+                                            return res.status(404).json({
+                                                error: 'Not found',
+                                                message: `No item found with id: ${req.params.id}`
+                                            });
+                                        }
+                                    } else {
+                                        // Initialize store with template data if empty
+                                        if (route.response.products || route.response.users || route.response.posts) {
+                                            const template = route.response.products?.[0] || 
+                                                           route.response.users?.[0] || 
+                                                           route.response.posts?.[0];
+                                            const count = route.response.posts?.length || 5;
+                                            StorageManager.initializeStore(basePath, generateDynamicData(template), count);
+                                        }
+                                        responseData = StorageManager.getAll(basePath);
+                                    }
+                                    break;
+
+                                case 'POST':
+                                    // Validate request body against schema if defined
+                                    if (route.schema) {
+                                        const validation = SchemaValidator.validate(req.body, route.schema);
+                                        if (!validation.isValid) {
+                                            return res.status(400).json({
+                                                error: 'Validation Error',
+                                                details: validation.errors
+                                            });
+                                        }
+                                    }
+
+                                    const storeName = basePath.split('/').pop();
+                                    const collectionName = `${storeName}s`;
+                                    
+                                    // Initialize store if needed
+                                    const store = StorageManager.getAll(basePath);
+                                    if (!store[collectionName]) {
+                                        store[collectionName] = [];
+                                    }
+
+                                    // Create new item with template and validated body data
+                                    const template = route.response || {};
+                                    const newData = {
+                                        id: crypto.randomUUID(),
+                                        ...generateDynamicData(template),
+                                        ...req.body
+                                    };
+
+                                    responseData = StorageManager.add(basePath, newData);
+                                    res.status(201);
+                                    break;
+
+                                case 'PUT':
+                                    // Validate request body against schema if defined
+                                    if (route.schema) {
+                                        const validation = SchemaValidator.validate(req.body, route.schema);
+                                        if (!validation.isValid) {
+                                            return res.status(400).json({
+                                                error: 'Validation Error',
+                                                details: validation.errors
+                                            });
+                                        }
+                                    }
+
+                                    const updateData = typeof req.body === 'object' ? 
+                                        { ...generateDynamicData(route.response), ...req.body } : 
+                                        req.body;
+                                    responseData = StorageManager.update(basePath, req.params.id, updateData);
+                                    if (!responseData) {
+                                        return res.status(404).json({
+                                            error: 'Not found',
+                                            message: `No item found with id: ${req.params.id}`
+                                        });
+                                    }
+                                    break;
+
+                                case 'DELETE':
+                                    if (!req.params.id) {
+                                        return res.status(400).json({
+                                            error: 'Bad Request',
+                                            message: 'ID parameter is required for DELETE operation'
+                                        });
+                                    }
+                                    const result = StorageManager.delete(basePath, req.params.id);
+                                    if (!result) {
+                                        return res.status(404).json({
+                                            error: 'Not Found',
+                                            message: `No item found with id: ${req.params.id}`
+                                        });
+                                    }
+                                    return res.status(204).send();
+
+                            }
+                        } else {
+                            // Non-persistent route, just generate dynamic data
+                            responseData = typeof route.response === 'object' ? 
+                                generateDynamicData(route.response) : route.response;
+                        }
+
+                        res.status(route.statusCode || 200).json(responseData);
+                    } catch (error) {
+                        console.error('Route handler error:', error);
+                        res.status(500).json({ 
+                            error: 'Internal server error',
+                            message: error.message
+                        });
                     }
-                    responseData = item;
-                  } else {
-                    // Initialize with template data if empty
-                    if (response.products || response.users || response.posts) {
-                      const template = (response.products?.[0] || response.users?.[0] || response.posts?.[0]);
-                      const count = response.posts?.length || 5; // Use template array length or default to 5
-                      StorageManager.initializeStore(basePath, generateDynamicData(template), count);
-                    }
-                    responseData = StorageManager.getAll(basePath);
-                  }
-                  break;
-                case 'POST':
-                  // Generate dynamic data first for new items
-                  const newData = typeof req.body === 'object' ? 
-                    { ...generateDynamicData(response), ...req.body } : 
-                    req.body;
-                  try {
-                    responseData = StorageManager.add(basePath, newData);
-                  } catch (validationError) {
-                    return res.status(400).json({ 
-                      error: 'Validation Error',
-                      message: validationError.message 
-                    });
-                  }
-                  break;
-                case 'PUT':
-                  // Merge dynamic data with request body
-                  const updateData = typeof req.body === 'object' ? 
-                    { ...generateDynamicData(response), ...req.body } : 
-                    req.body;
-                  try {
-                    responseData = StorageManager.update(basePath, req.params.id, updateData);
-                  } catch (validationError) {
-                    return res.status(400).json({ 
-                      error: 'Validation Error',
-                      message: validationError.message 
-                    });
-                  }
-                  if (!responseData) {
-                    return res.status(404).json({ 
-                      error: 'Not found',
-                      message: `No item found with id: ${req.params.id}`
-                    });
-                  }
-                  break;
-                case 'DELETE':
-                  const deleted = StorageManager.delete(basePath, req.params.id);
-                  if (!deleted) {
-                    return res.status(404).json({ 
-                      error: 'Not found',
-                      message: `No item found with id: ${req.params.id}`
-                    });
-                  }
-                  // Send response message before ending connection
-                  return res.status(statusCode).json(responseData);
-              }
-            } else if (typeof responseData === 'object') {
-              responseData = generateDynamicData(responseData);
+                });
+
+                console.log(`Registered route: ${route.method} ${path}`);
+                metrics.loaded++;
+            } catch (error) {
+                console.error(`Failed to load route: ${route.path}`, {
+                    error: error.message,
+                    route: JSON.stringify(route, null, 2)
+                });
+                metrics.failed++;
             }
+        }
 
-            res.status(statusCode).json(responseData);
-          } catch (error) {
-            console.error('Request handling error:', error);
-            res.status(500).json({ 
-              error: 'Internal Server Error',
-              message: error.message 
-            });
-          }
-        });
+        console.log('\nAll registered routes:');
+        registeredRoutes.forEach(route => console.log(`- ${route}`));
 
-        console.log(`Route loaded successfully: ${method.toUpperCase()} ${routePath}`);
-      } catch (routeError) {
-        console.error(`Failed to load route: ${route.path}`, routeError.message);
-      }
+        // Log metrics after loading
+        console.log('\nRoute Loading Metrics:');
+        console.log(`Total Routes: ${metrics.total}`);
+        console.log(`Successfully Loaded: ${metrics.loaded}`);
+        console.log(`Failed to Load: ${metrics.failed}`);
+        console.log(`Duplicate Routes Skipped: ${metrics.duplicates}`);
+
+    } catch (error) {
+        console.error('Fatal error loading routes:', error);
+        throw error;
     }
-
-    // Log all registered routes
-    console.log('All registered routes:');
-    usedPaths.forEach(route => console.log(`- ${route}`));
-
-  } catch (error) {
-    console.error('Error loading routes:', error);
-    throw error;
-  }
 }
