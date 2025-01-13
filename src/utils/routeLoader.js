@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { validateRouteConfig } from './validation.js';
+import { validateRouteConfig, validateRequestData } from './validation.js';
 import { generateDynamicData } from './dataGenerator.js';
 import { StorageManager } from './storage.js';  // Only import the class
 import { SchemaValidator } from './schemaValidator.js';  // Add this import
@@ -107,7 +107,7 @@ export async function loadRoutes(app, routesConfig) {
                                 case 'POST':
                                     // Validate request body against schema if defined
                                     if (route.schema) {
-                                        const validation = SchemaValidator.validate(req.body, route.schema);
+                                        const validation = validateRequestData(req.body, route.schema);
                                         if (!validation.isValid) {
                                             return res.status(400).json({
                                                 error: 'Validation Error',
@@ -140,7 +140,7 @@ export async function loadRoutes(app, routesConfig) {
                                 case 'PUT':
                                     // Validate request body against schema if defined
                                     if (route.schema) {
-                                        const validation = SchemaValidator.validate(req.body, route.schema);
+                                        const validation = validateRequestData(req.body, route.schema);
                                         if (!validation.isValid) {
                                             return res.status(400).json({
                                                 error: 'Validation Error',

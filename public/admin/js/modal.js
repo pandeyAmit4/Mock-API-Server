@@ -10,8 +10,8 @@ export class ModalManager {
         const style = document.createElement('style');
         style.textContent = `
             :root {
-                --primary-color: #4f46e5;
-                --primary-hover: #4338ca;
+                --primary-color: #02506e;
+                --primary-hover:rgb(5, 107, 147);
                 --secondary-color: #64748b;
                 --success-color: #22c55e;
                 --danger-color: #ef4444;

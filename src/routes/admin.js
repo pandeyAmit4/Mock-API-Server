@@ -52,20 +52,8 @@ router.post('/validate-route', async (req, res) => {
         }
 
         // Basic route validation
-        validateRouteConfig(route);
+        validateRouteConfig(route, true);  // Pass true to only check schema format
         
-        // Schema validation if present
-        if (route.schema && route.response) {
-            const validation = SchemaValidator.validate(route.response, route.schema);
-            if (!validation.isValid) {
-                console.log('Schema validation failed:', validation.errors);  // Add logging
-                return res.status(400).json({
-                    success: false,
-                    error: `Schema validation failed: ${validation.errors.join(', ')}`
-                });
-            }
-        }
-
         // For route validation during save, don't check for duplicates
         if (!req.query.checkDuplicates) {
             res.json({ 
@@ -121,7 +109,7 @@ router.post('/routes', async (req, res) => {
         }
         
         // Validate all routes
-        routes.forEach(validateRouteConfig);
+        routes.forEach(route => validateRouteConfig(route, true));
         
         // Check for duplicates
         validateDuplicateRoutes(routes);

@@ -1,85 +1,50 @@
-export function validateRouteConfig(route) {
+import { SchemaValidator } from './schemaValidator.js';
+
+export function validateRouteConfig(route, checkSchema = false) {
+    if (!route || typeof route !== 'object') {
+        throw new Error('Route configuration must be an object');
+    }
+
     if (!route.path || typeof route.path !== 'string') {
-        throw new Error('Route path must be a string');
+        throw new Error('Route must have a valid path');
     }
 
-    if (!route.method || !['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].includes(route.method.toUpperCase())) {
-        throw new Error('Invalid HTTP method');
+    if (!route.method || typeof route.method !== 'string') {
+        throw new Error('Route must have a valid HTTP method');
     }
 
-    // Make response optional for DELETE requests
-    if (route.method.toUpperCase() !== 'DELETE' && !route.response) {
-        throw new Error('Response configuration is required except for DELETE method');
-    }
-
-    if (route.statusCode && (!Number.isInteger(route.statusCode) || route.statusCode < 100 || route.statusCode > 599)) {
-        throw new Error('Invalid status code');
-    }
-
-    if (route.delay && (!Number.isInteger(route.delay) || route.delay < 0)) {
-        throw new Error('Delay must be a positive integer');
-    }
-
-    // Validate error configuration if present
-    if (route.error) {
-        if (typeof route.error.enabled !== 'boolean') {
-            throw new Error('Error simulation enabled must be a boolean');
-        }
-
-        if (route.error.enabled) {
-            if (typeof route.error.probability !== 'number' || 
-                route.error.probability < 0 || 
-                route.error.probability > 100) {
-                throw new Error('Error probability must be between 0 and 100');
+    // Only validate schema format, not the response data
+    if (checkSchema && route.schema) {
+        try {
+            // Just verify the schema is valid JSON and has the correct structure
+            if (typeof route.schema !== 'object') {
+                const parsed = JSON.parse(route.schema);
+                if (typeof parsed !== 'object') {
+                    throw new Error('Schema must be a valid JSON object');
+                }
             }
-
-            if (!route.error.status || 
-                !Number.isInteger(route.error.status) || 
-                route.error.status < 100 || 
-                route.error.status > 599) {
-                throw new Error('Invalid error status code');
-            }
-
-            if (!route.error.message || typeof route.error.message !== 'string') {
-                throw new Error('Error message must be a non-empty string');
-            }
+        } catch (error) {
+            throw new Error(`Invalid schema format: ${error.message}`);
         }
     }
 
-    // Validate persistence configuration
-    if (route.persist) {
-        if (!route.path.startsWith('/api/')) {
-            throw new Error('Persistent routes must start with /api/');
-        }
-
-        // Ensure proper ID handling for persistent routes with parameters
-        if (route.path.includes(':id') && 
-            route.method.toUpperCase() !== 'DELETE' && 
-            !route.response?.id) {
-            throw new Error('Persistent routes with :id parameter must include id in response template');
-        }
-    }
-
-    // Additional validation for POST/PUT methods
-    if (['POST', 'PUT'].includes(route.method.toUpperCase()) && route.persist) {
-        if (!route.schema) {
-            console.warn(`Warning: No schema defined for ${route.method} ${route.path}`);
-        }
-    }
-
-    // Return true if validation passes
     return true;
 }
 
-// Separate function for duplicate checking
 export function validateDuplicateRoutes(routes) {
-    const usedPaths = new Map();
+    const routeMap = new Map();
+    
     routes.forEach(route => {
-        const routeKey = `${route.method.toUpperCase()}:${route.path}`;
-        if (usedPaths.has(routeKey)) {
-            throw new Error(`Duplicate route found: ${routeKey}`);
+        const key = `${route.method.toUpperCase()}:${route.path}`;
+        if (routeMap.has(key)) {
+            throw new Error(`Duplicate route found: ${route.method} ${route.path}`);
         }
-        usedPaths.set(routeKey, true);
+        routeMap.set(key, true);
     });
+
     return true;
+}
+
+export function validateRequestData(data, schema) {
+    return SchemaValidator.validate(data, schema);
 }
