@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Mock API Admin Panel</title>
+    <title>Mock API Admin</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/js-toast-notifier@1.0.12/dist/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/js-toast-notifier@1.0.12/dist/index.umd.js"></script>
 </head>
 <body>
     <div class="container">
@@ -19,8 +20,8 @@
         <div id="routes" class="tab-content active">
             <h2>Routes Configuration</h2>
             <div class="header-actions">
-                <button id="addRoute">Add New Route</button>
-                <button id="loadSamples">Load Sample Routes</button>
+                <button id="addRoute">Add Route</button>
+                <button id="loadSamples">Load Samples</button>
             </div>
             <div id="routesList"></div>
         </div>
@@ -28,9 +29,9 @@
         <div id="storage" class="tab-content">
             <h2>Storage Management</h2>
             <div class="storage-actions">
-                <button onclick="resetStorage('/api/users')">Reset Users</button>
-                <button onclick="resetStorage('/api/products')">Reset Products</button>
-                <button onclick="resetStorage('/api/blog-posts')">Reset Blog Posts</button>
+                <button onclick="storageManager.resetStorage('/api/users')">Reset Users</button>
+                <button onclick="storageManager.resetStorage('/api/products')">Reset Products</button>
+                <button onclick="storageManager.resetStorage('/api/blog-posts')">Reset Blog Posts</button>
             </div>
         </div>
 
@@ -61,20 +62,19 @@
                 <input type="text" id="logsSearch" placeholder="Search logs..." class="logs-search">
             </div>
             <div class="logs-actions">
-                <button onclick="clearLogs()">Clear Logs</button>
-                <button onclick="refreshLogs()">Refresh</button>
-                <button onclick="expandAllLogs()">Expand All</button>
-                <button onclick="collapseAllLogs()">Collapse All</button>
-                <button onclick="exportLogs()" class="export-btn">Export Logs</button>
+                <button id="clearLogs">Clear Logs</button>
+                <button id="refreshLogs">Refresh</button>
+                <button id="expandAll">Expand All</button>
+                <button id="collapseAll">Collapse All</button>
+                <button id="exportLogs">Export Logs</button>
             </div>
             <div id="logsList" class="logs-list"></div>
         </div>
     </div>
 
     <div class="sticky-footer">
-        <span id="unsavedIndicator" class="unsaved-changes" style="display: none;">You have unsaved changes!</span>
-        <button id="saveRoutes" class="save-button">Save Changes</button>
+        <span id="unsavedIndicator" class="unsaved-changes" style="display: none;">Unsaved Changes!</span>
+        <button id="saveRoutes" class="save-button">Save Routes</button>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/js-toast-notifier@1.0.12/dist/index.umd.js"></script>
-    <script src="app.js"></script>
+    <script type="module" src="js/index.js"></script>
 </body></html>

@@ -83,13 +83,17 @@ class Logger {
         if (this.logs.length > this.maxLogs) {
             this.logs = this.logs.slice(0, this.maxLogs);
         }
+
+        console.log('New log entry:', log.method, log.url, log.status);  // Debug log
     }
 
     getLogs(limit = 100) {
+        // console.log('Getting logs, total:', this.logs.length);  // Debug log
         return this.logs.slice(0, Math.min(limit, this.logs.length));
     }
 
     clear() {
+        console.log('Clearing logs');  // Debug log
         this.logs = [];
     }
 }

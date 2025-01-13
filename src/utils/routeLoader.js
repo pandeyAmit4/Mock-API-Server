@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { validateRouteConfig } from './validation.js';
 import { generateDynamicData } from './dataGenerator.js';
-import { StorageManager } from './storage.js';
+import { StorageManager } from './storage.js';  // Only import the class
 import { SchemaValidator } from './schemaValidator.js';  // Add this import
 import { applyDelay } from './delay.js';
 

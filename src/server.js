@@ -12,6 +12,7 @@ import { loadRoutes } from './utils/routeLoader.js';
 import { sampleRoutes } from './config/sampleRoutes.js';
 import { logger } from './utils/logger.js';
 import { requestLogger } from './middleware/requestLogger.js';
+import adminRouter from './routes/admin.js';  // Updated import
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,25 +25,62 @@ export async function startServer({
 }) {
     const app = express();
     
-    // Basic middleware setup (must be first)
     app.use(express.json());
     app.use(cors());
-
-    // Add request logger
     app.use(requestLogger);
 
-    // Initialize settings
+    // Initialize settings and routes configuration
     await loadSettings();
+    
+    // Load initial routes configuration
+    try {
+        const configPath = path.join(__dirname, '../config/routes.json');
+        try {
+            const existingRoutes = JSON.parse(await fs.readFile(configPath, 'utf8'));
+            routesConfig = existingRoutes;
+        } catch (error) {
+            console.log('No existing routes found, using defaults');
+            routesConfig = sampleRoutes;
+            await fs.writeFile(configPath, JSON.stringify(sampleRoutes, null, 2));
+        }
+    } catch (error) {
+        console.error('Error loading routes configuration:', error);
+    }
+
+    // Mount admin routes with the current configuration
+    app.use('/api/admin', (req, res, next) => {
+        req.routesConfig = routesConfig;  // Make routes available to admin router
+        next();
+    }, adminRouter);
 
     // Admin API endpoints (must come before dynamic routes)
     app.get('/api/admin/routes', async (req, res) => {
         try {
-            const configPath = path.join(__dirname, '../config/routes.json');
-            const routes = JSON.parse(await fs.readFile(configPath, 'utf8'));
+            // First try to read from config file
+            let routes = [];
+            try {
+                const configPath = path.join(__dirname, '../config/routes.json');
+                routes = JSON.parse(await fs.readFile(configPath, 'utf8'));
+            } catch (error) {
+                // If file doesn't exist or is invalid, use sample routes
+                console.log('Using sample routes as default configuration');
+                routes = sampleRoutes;
+                
+                // Save sample routes to config file
+                const configPath = path.join(__dirname, '../config/routes.json');
+                await fs.writeFile(configPath, JSON.stringify(sampleRoutes, null, 2));
+            }
+            
+            // Load the routes into the server
+            await loadRoutes(app, routes);
+            
             res.json(routes);
         } catch (error) {
             console.error('Error reading routes:', error);
-            res.status(500).json({ error: 'Failed to read routes' });
+            res.status(500).json({ 
+                error: 'Failed to read routes',
+                message: error.message 
+            });
         }
     });
 

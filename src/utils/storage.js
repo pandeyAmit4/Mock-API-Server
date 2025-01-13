@@ -1,10 +1,13 @@
 import { SchemaValidator } from './schemaValidator.js';
 import { logger, LogLevel } from './logger.js';
 
-const storage = new Map();
 const schemas = new Map();
 
-export class StorageManager {
+class StorageManager {
+  static storage = new Map();  // Convert to static property
+
+  // Remove instance storage since we're using static
+
   static setSchema(path, schema) {
     schemas.set(path, schema);
   }
@@ -16,28 +19,41 @@ export class StorageManager {
   }
 
   static initializeStore(path, template, count = 5) {
-    if (!storage.has(path) || storage.get(path).length === 0) {
+    const storeName = this.getStoreName(path);
+    if (!this.storage.has(path) || !this.storage.get(path)[storeName]?.length) {
       // Generate multiple items using the template
       const items = Array(count).fill(null).map(() => ({
         ...template,
         id: crypto.randomUUID()
       }));
-      storage.set(path, items);
+      this.storage.set(path, { [storeName]: items });
     }
     return this.getStore(path);
   }
 
+  static normalizePath(path) {
+    // Remove trailing slash and ensure /api/ prefix
+    path = path.replace(/\/$/, '');
+    if (!path.startsWith('/api/')) {
+      path = `/api${path.startsWith('/') ? path : `/${path}`}`;
+    }
+    return path;
+  }
+
   static getStoreName(path) {
     const parts = path.split('/');
-    return parts[parts.length - 1] + 's';
+    const resource = parts[parts.length - 1];
+    // Ensure we have a valid resource name
+    return resource ? `${resource}s` : 'items';
   }
 
   static getStore(path) {
-    const storeName = this.getStoreName(path);
-    if (!storage.has(path)) {
-      storage.set(path, { [storeName]: [] });
+    const normalizedPath = this.normalizePath(path);
+    const storeName = this.getStoreName(normalizedPath);
+    if (!this.storage.has(normalizedPath)) {
+      this.storage.set(normalizedPath, { [storeName]: [] });
     }
-    return storage.get(path);
+    return this.storage.get(normalizedPath);
   }
 
   static add(path, data) {
@@ -110,7 +126,23 @@ export class StorageManager {
   }
 
   static getAll(path) {
-    return this.getStore(path);
+    try {
+      const normalizedPath = this.normalizePath(path);
+      console.log('Getting storage for:', normalizedPath);
+      const storeName = this.getStoreName(normalizedPath);
+      const store = this.getStore(normalizedPath);
+      
+      // Ensure the store has the correct structure
+      if (!store[storeName]) {
+        store[storeName] = [];
+      }
+      
+      console.log('Storage data:', store);
+      return store;
+    } catch (error) {
+      console.error('Error getting storage:', error);
+      throw new Error(`Failed to get storage for ${path}: ${error.message}`);
+    }
   }
 
   static getById(path, id) {
@@ -121,10 +153,17 @@ export class StorageManager {
   }
 
   static reset(path, initialData = []) {
-    const storeName = this.getStoreName(path);
-    storage.set(path, { [storeName]: [...initialData] });
-    logger.info(`Reset storage for ${path}`);
-    return this.getStore(path);
+    const normalizedPath = this.normalizePath(path);
+    const storeName = this.getStoreName(normalizedPath);
+    
+    // Handle both array and object with collection
+    const data = Array.isArray(initialData) ? 
+      { [storeName]: initialData } : 
+      initialData;
+    
+    this.storage.set(normalizedPath, data);
+    logger.info(`Reset storage for ${normalizedPath}`);
+    return this.getStore(normalizedPath);
   }
 
   static preload(path, data) {
@@ -141,8 +180,10 @@ export class StorageManager {
   }
 
   static resetAll() {
-    storage.clear();
+    this.storage.clear();
     schemas.clear();
     logger.info('Reset all storage');
   }
 }
+
+export { StorageManager };  // Export the class
