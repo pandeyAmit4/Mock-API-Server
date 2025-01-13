@@ -4,6 +4,8 @@ export class ModalManager {
     constructor() {
         this.addModalStyles();
         this.currentModal = null;
+        this.editMode = false;
+        this.callback = null;
     }
 
     addModalStyles() {
@@ -229,13 +231,13 @@ export class ModalManager {
         document.head.appendChild(style);
     }
 
-    createRouteModal() {
+    createRouteModal(existingRoute = null) {
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.innerHTML = `
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Create New Route</h2>
+                    <h2>${existingRoute ? 'Edit Route' : 'Create New Route'}</h2>
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
@@ -245,13 +247,16 @@ export class ModalManager {
                     </div>
 
                     <div class="form-group">
-                        <label>Operations:</label>
-                        <div class="checkbox-group">
-                            <label><input type="checkbox" id="opGet" checked> GET (List/Read)</label>
-                            <label><input type="checkbox" id="opPost" checked> POST (Create)</label>
-                            <label><input type="checkbox" id="opPut" checked> PUT (Update)</label>
-                            <label><input type="checkbox" id="opDelete" checked> DELETE (Remove)</label>
-                        </div>
+                        <label>HTTP Method:</label>
+                        ${existingRoute ? 
+                            `<input type="text" id="routeMethod" value="${existingRoute.method}" readonly>` :
+                            `<div class="checkbox-group">
+                                <label><input type="checkbox" id="opGet" checked> GET (List/Read)</label>
+                                <label><input type="checkbox" id="opPost" checked> POST (Create)</label>
+                                <label><input type="checkbox" id="opPut" checked> PUT (Update)</label>
+                                <label><input type="checkbox" id="opDelete" checked> DELETE (Remove)</label>
+                            </div>`
+                        }
                     </div>
 
                     <div class="form-group">
@@ -289,7 +294,9 @@ export class ModalManager {
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button id="createRoutesBtn" class="primary">Create Routes</button>
+                    <button id="saveRouteBtn" class="primary">
+                        ${existingRoute ? 'Update Route' : 'Create Routes'}
+                    </button>
                     <button id="cancelModalBtn" class="cancel">Cancel</button>
                 </div>
             </div>
@@ -297,10 +304,16 @@ export class ModalManager {
         return modal;
     }
 
-    show() {
-        this.currentModal = this.createRouteModal();
+    show(existingRoute = null, callback = null) {
+        this.editMode = !!existingRoute;
+        this.callback = callback;
+        this.currentModal = this.createRouteModal(existingRoute);
         document.body.appendChild(this.currentModal);
         this.setupModalEventListeners();
+
+        if (existingRoute) {
+            this.populateForm(existingRoute);
+        }
     }
 
     close() {
@@ -335,9 +348,15 @@ export class ModalManager {
             }
         });
 
-        // Create button click
-        document.getElementById('createRoutesBtn').addEventListener('click', () => {
-            routeManager.createRoutes();
+        // Save/Create button click
+        document.getElementById('saveRouteBtn').addEventListener('click', () => {
+            const formData = this.getFormData();
+            if (this.editMode && this.callback) {
+                this.callback(formData);
+                this.close();
+            } else {
+                routeManager.createRoutes();
+            }
         });
 
         // Cancel button click
@@ -353,29 +372,222 @@ export class ModalManager {
             }
         };
         document.addEventListener('keydown', escapeHandler);
+
+        // Add schema auto-generation on template change
+        document.getElementById('responseTemplate').addEventListener('change', (e) => {
+            if (document.getElementById('enableSchema').checked) {
+                try {
+                    const template = JSON.parse(e.target.value);
+                    const schema = this.generateSchemaFromResponse(template);
+                    document.getElementById('schemaTemplate').value = JSON.stringify(schema, null, 2);
+                } catch (error) {
+                    showToast('Invalid JSON in response template', 'error');
+                }
+            }
+        });
+
+        // Update schema when enabling schema validation
+        document.getElementById('enableSchema').addEventListener('change', (e) => {
+            const schemaTemplate = document.getElementById('schemaTemplate');
+            schemaTemplate.disabled = !e.target.checked;
+            
+            if (e.target.checked) {
+                try {
+                    const template = JSON.parse(document.getElementById('responseTemplate').value);
+                    const schema = this.generateSchemaFromResponse(template);
+                    schemaTemplate.value = JSON.stringify(schema, null, 2);
+                } catch (error) {
+                    showToast('Invalid JSON in response template', 'error');
+                }
+            }
+        });
+    }
+
+    populateForm(route) {
+        document.getElementById('routePath').value = route.path || '';
+        
+        // Set method if in edit mode
+        if (this.editMode) {
+            document.getElementById('routeMethod').value = route.method || '';
+        }
+
+        // Handle response template
+        if (route.response) {
+            const responseStr = typeof route.response === 'string' ? 
+                route.response : 
+                JSON.stringify(route.response, null, 2);
+            document.getElementById('responseTemplate').value = responseStr;
+            
+            // Auto-generate schema if schema validation is enabled
+            if (document.getElementById('enableSchema').checked && !route.schema) {
+                const schema = this.generateSchemaFromResponse(route.response);
+                document.getElementById('schemaTemplate').value = JSON.stringify(schema, null, 2);
+            }
+        }
+
+        // Handle schema
+        if (route.schema) {
+            document.getElementById('enableSchema').checked = true;
+            document.getElementById('schemaTemplate').disabled = false;
+            document.getElementById('schemaTemplate').value = 
+                typeof route.schema === 'string' ? 
+                route.schema : 
+                JSON.stringify(route.schema, null, 2);
+        }
+
+        if (route.error?.enabled) {
+            document.getElementById('enableError').checked = true;
+            document.getElementById('errorSettings').style.display = 'block';
+            document.getElementById('errorProb').value = route.error.probability || 25;
+            document.getElementById('errorStatus').value = route.error.status || 500;
+            document.getElementById('errorMessage').value = route.error.message || '';
+        }
+
+        if (route.delay) {
+            document.getElementById('enableDelay').checked = true;
+            document.getElementById('delaySettings').style.display = 'block';
+            document.getElementById('delayMs').value = route.delay;
+        }
+    }
+
+    generateSchemaFromResponse(response) {
+        // Handle arrays or objects with collection names
+        if (Array.isArray(response)) {
+            return this.generateSchemaFromObject(response[0]);
+        }
+
+        // Handle response with collection wrapper (e.g., { users: [...] })
+        const collectionKey = Object.keys(response).find(key => Array.isArray(response[key]));
+        if (collectionKey && response[collectionKey].length > 0) {
+            return this.generateSchemaFromObject(response[collectionKey][0]);
+        }
+
+        // Handle single object
+        return this.generateSchemaFromObject(response);
+    }
+
+    generateSchemaFromObject(obj) {
+        const schema = {};
+        
+        if (typeof obj === 'object' && obj !== null) {
+            Object.entries(obj).forEach(([key, value]) => {
+                // Skip id field as it's auto-generated
+                if (key === 'id') return;
+
+                // Handle faker template strings
+                if (typeof value === 'string' && value.includes('{{faker.')) {
+                    const fakerPath = value.match(/{{faker\.(.*?)}}/)[1];
+                    const type = this.getFakerTemplateType(fakerPath);
+                    schema[key] = type;
+                } else {
+                    // Handle regular values
+                    schema[key] = this.getValueType(value);
+                }
+            });
+        }
+        
+        return schema;
+    }
+
+    getFakerTemplateType(fakerPath) {
+        // Map faker paths to schema types
+        const typeMap = {
+            'string': 'string',
+            'number': 'number',
+            'date': 'string',
+            'internet.email': 'string',
+            'internet.url': 'string',
+            'person.firstName': 'string',
+            'person.lastName': 'string',
+            'person.fullName': 'string',
+            'image.url': 'string',
+            'image.avatar': 'string',
+            'commerce.price': 'number',
+            'commerce.productName': 'string',
+            'commerce.productDescription': 'string',
+            'boolean': 'boolean'
+        };
+
+        // Find matching type or default to string
+        const matchingPath = Object.keys(typeMap).find(path => fakerPath.startsWith(path));
+        return typeMap[matchingPath] || 'string';
+    }
+
+    getValueType(value) {
+        if (Array.isArray(value)) return 'array';
+        if (value === null) return 'string'; // Default to string for null values
+        if (typeof value === 'object') return 'object';
+        return typeof value;
     }
 
     getFormData() {
-        return {
-            path: document.getElementById('routePath').value.trim(),
-            operations: {
-                get: document.getElementById('opGet').checked,
-                post: document.getElementById('opPost').checked,
-                put: document.getElementById('opPut').checked,
-                delete: document.getElementById('opDelete').checked
-            },
-            template: document.getElementById('responseTemplate').value,
-            schema: document.getElementById('enableSchema').checked ? 
-                document.getElementById('schemaTemplate').value : null,
-            error: document.getElementById('enableError').checked ? {
-                enabled: true,
-                probability: parseInt(document.getElementById('errorProb').value),
-                status: parseInt(document.getElementById('errorStatus').value),
-                message: document.getElementById('errorMessage').value
-            } : null,
-            delay: document.getElementById('enableDelay').checked ? 
-                parseInt(document.getElementById('delayMs').value) : null
-        };
+        try {
+            const responseTemplate = document.getElementById('responseTemplate').value;
+            const response = responseTemplate ? JSON.parse(responseTemplate) : {};
+            const method = this.editMode ? 
+                document.getElementById('routeMethod').value.toUpperCase() :
+                this.getSelectedMethod();
+            
+            console.log('Building form data in', this.editMode ? 'edit' : 'create', 'mode');
+
+            // Base configuration that's common for both edit and create modes
+            const formData = {
+                path: document.getElementById('routePath').value.trim(),
+                method: method,
+                response: response,
+                persist: true
+            };
+
+            // Schema validation settings
+            if (document.getElementById('enableSchema').checked) {
+                const schemaValue = document.getElementById('schemaTemplate').value;
+                formData.schema = JSON.parse(schemaValue);
+                formData.validateRequest = (method === 'POST' || method === 'PUT');
+            }
+
+            // Error simulation settings
+            const errorEnabled = document.getElementById('enableError').checked;
+            if (errorEnabled) {
+                console.log('Adding error settings');
+                formData.error = {
+                    enabled: true,
+                    probability: parseInt(document.getElementById('errorProb').value) || 25,
+                    status: parseInt(document.getElementById('errorStatus').value) || 500,
+                    message: document.getElementById('errorMessage').value || 'Simulated error'
+                };
+            }
+
+            // Delay settings
+            const delayEnabled = document.getElementById('enableDelay').checked;
+            if (delayEnabled) {
+                console.log('Adding delay settings');
+                formData.delay = parseInt(document.getElementById('delayMs').value) || 1000;
+            }
+
+            // Operations only in create mode
+            if (!this.editMode) {
+                formData.operations = {
+                    get: document.getElementById('opGet').checked,
+                    post: document.getElementById('opPost').checked,
+                    put: document.getElementById('opPut').checked,
+                    delete: document.getElementById('opDelete').checked
+                };
+            }
+
+            console.log('Final form data:', formData);
+            return formData;
+        } catch (error) {
+            showToast('Invalid JSON in form data: ' + error.message, 'error');
+            throw error;
+        }
+    }
+
+    getSelectedMethod() {
+        if (document.getElementById('opGet').checked) return 'GET';
+        if (document.getElementById('opPost').checked) return 'POST';
+        if (document.getElementById('opPut').checked) return 'PUT';
+        if (document.getElementById('opDelete').checked) return 'DELETE';
+        throw new Error('No HTTP method selected');
     }
 }
 

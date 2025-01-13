@@ -11,6 +11,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function loadRoutes(app, routesConfig) {
     try {
+        // Clear existing routes first
+        app._router.stack = app._router.stack.filter(layer => {
+            return !layer.route || layer.route.path.startsWith('/api/admin') || 
+                   layer.route.path === '/admin' || layer.route.path === '/docs';
+        });
+
         // Add route count validation
         if (!Array.isArray(routesConfig) || routesConfig.length === 0) {
             console.warn('No routes configured');
@@ -60,19 +66,32 @@ export async function loadRoutes(app, routesConfig) {
                 // Register route handler with normalized path
                 app[route.method.toLowerCase()](path, async (req, res) => {
                     try {
+                        console.log('Processing request:', {
+                            method: route.method,
+                            path: path,
+                            error: route.error,
+                            delay: route.delay
+                        });
+
                         // Handle error simulation
-                        if (route.error?.enabled) {
-                            const shouldError = Math.random() * 100 <= route.error.probability;
-                            if (shouldError) {
-                                return res.status(route.error.status).json({
+                        if (route.error && route.error.enabled) {
+                            const probability = parseFloat(route.error.probability) || 25;
+                            console.log('Error simulation check:', {
+                                enabled: route.error.enabled,
+                                probability,
+                                random: Math.random() * 100
+                            });
+                            if (Math.random() * 100 <= probability) {
+                                return res.status(route.error.status || 500).json({
                                     error: true,
-                                    message: route.error.message
+                                    message: route.error.message || 'Simulated error'
                                 });
                             }
                         }
 
                         // Apply delay if specified
-                        if (route.delay) {
+                        if (route.delay && route.delay > 0) {
+                            console.log(`Applying delay: ${route.delay}ms`);
                             await new Promise(resolve => setTimeout(resolve, route.delay));
                         }
 
@@ -83,6 +102,7 @@ export async function loadRoutes(app, routesConfig) {
                         if (route.persist) {
                             switch (route.method.toUpperCase()) {
                                 case 'GET':
+                                    // No schema validation needed for GET
                                     if (req.params.id) {
                                         responseData = StorageManager.getById(basePath, req.params.id);
                                         if (!responseData) {
@@ -105,41 +125,9 @@ export async function loadRoutes(app, routesConfig) {
                                     break;
 
                                 case 'POST':
-                                    // Validate request body against schema if defined
-                                    if (route.schema) {
-                                        const validation = validateRequestData(req.body, route.schema);
-                                        if (!validation.isValid) {
-                                            return res.status(400).json({
-                                                error: 'Validation Error',
-                                                details: validation.errors
-                                            });
-                                        }
-                                    }
-
-                                    const storeName = basePath.split('/').pop();
-                                    const collectionName = `${storeName}s`;
-                                    
-                                    // Initialize store if needed
-                                    const store = StorageManager.getAll(basePath);
-                                    if (!store[collectionName]) {
-                                        store[collectionName] = [];
-                                    }
-
-                                    // Create new item with template and validated body data
-                                    const template = route.response || {};
-                                    const newData = {
-                                        id: crypto.randomUUID(),
-                                        ...generateDynamicData(template),
-                                        ...req.body
-                                    };
-
-                                    responseData = StorageManager.add(basePath, newData);
-                                    res.status(201);
-                                    break;
-
                                 case 'PUT':
-                                    // Validate request body against schema if defined
-                                    if (route.schema) {
+                                    // Schema validation only for write operations
+                                    if (route.schema && route.validateRequest) {
                                         const validation = validateRequestData(req.body, route.schema);
                                         if (!validation.isValid) {
                                             return res.status(400).json({
@@ -149,19 +137,42 @@ export async function loadRoutes(app, routesConfig) {
                                         }
                                     }
 
-                                    const updateData = typeof req.body === 'object' ? 
-                                        { ...generateDynamicData(route.response), ...req.body } : 
-                                        req.body;
-                                    responseData = StorageManager.update(basePath, req.params.id, updateData);
-                                    if (!responseData) {
-                                        return res.status(404).json({
-                                            error: 'Not found',
-                                            message: `No item found with id: ${req.params.id}`
-                                        });
+                                    if (route.method.toUpperCase() === 'POST') {
+                                        const storeName = basePath.split('/').pop();
+                                        const collectionName = `${storeName}s`;
+                                        
+                                        // Initialize store if needed
+                                        const store = StorageManager.getAll(basePath);
+                                        if (!store[collectionName]) {
+                                            store[collectionName] = [];
+                                        }
+
+                                        // Create new item with template and validated body data
+                                        const template = route.response || {};
+                                        const newData = {
+                                            id: crypto.randomUUID(),
+                                            ...generateDynamicData(template),
+                                            ...req.body
+                                        };
+
+                                        responseData = StorageManager.add(basePath, newData);
+                                        res.status(201);
+                                    } else if (route.method.toUpperCase() === 'PUT') {
+                                        const updateData = typeof req.body === 'object' ? 
+                                            { ...generateDynamicData(route.response), ...req.body } : 
+                                            req.body;
+                                        responseData = StorageManager.update(basePath, req.params.id, updateData);
+                                        if (!responseData) {
+                                            return res.status(404).json({
+                                                error: 'Not found',
+                                                message: `No item found with id: ${req.params.id}`
+                                            });
+                                        }
                                     }
                                     break;
 
                                 case 'DELETE':
+                                    // No schema validation needed for DELETE
                                     if (!req.params.id) {
                                         return res.status(400).json({
                                             error: 'Bad Request',

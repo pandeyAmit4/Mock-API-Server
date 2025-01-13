@@ -1,15 +1,13 @@
 import express from 'express';
 import { validateRouteConfig, validateDuplicateRoutes } from '../utils/validation.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
-import { RouteValidator } from '../utils/routeValidator.js';
-import { StorageManager } from '../utils/storage.js';  // Only import the class
+import { StorageManager } from '../utils/storage.js';
 import { loadRoutes } from '../utils/routeLoader.js';
 import { generateDynamicData } from '../utils/dataGenerator.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
-import { sampleRoutes } from '../config/sampleRoutes.js';  // Add this import
-import { logger } from '../utils/logger.js';  // Add this import
+import { sampleRoutes } from '../config/sampleRoutes.js';
+import { logger } from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = express.Router();
@@ -100,6 +98,7 @@ router.get('/routes', (req, res) => {
 router.post('/routes', async (req, res) => {
     try {
         const routes = req.body;
+        const configPath = path.join(__dirname, '../../config/routes.json');
         
         if (!Array.isArray(routes)) {
             return res.status(400).json({ 
@@ -114,18 +113,22 @@ router.post('/routes', async (req, res) => {
         // Check for duplicates
         validateDuplicateRoutes(routes);
         
-        // Save routes configuration
+        // Update routes configuration first
         routesConfig = routes;
         
-        // Reload routes in the server
+        // Save to config file
+        await fs.writeFile(configPath, JSON.stringify(routes, null, 2));
+        
+        // Reload routes in the server - this is crucial for updates to take effect
         await loadRoutes(req.app, routes);
         
         res.json({ 
             success: true, 
-            message: 'Routes updated successfully',
+            message: 'Routes updated and saved successfully',
             count: routes.length
         });
     } catch (error) {
+        console.error('Failed to save routes:', error);
         res.status(400).json({ 
             success: false, 
             error: error.message 
@@ -136,12 +139,16 @@ router.post('/routes', async (req, res) => {
 // Update the load-samples endpoint
 router.post('/load-samples', async (req, res) => {
     try {
-        // Use the imported sample routes directly
+        const configPath = path.join(__dirname, '../../config/routes.json');
+
         // Validate sample routes
         sampleRoutes.forEach(validateRouteConfig);
         
         // Add to existing routes
         routesConfig = [...routesConfig, ...sampleRoutes];
+        
+        // Save updated config to file
+        await fs.writeFile(configPath, JSON.stringify(routesConfig, null, 2));
         
         // Reload routes in the server
         await loadRoutes(req.app, routesConfig);
@@ -168,7 +175,7 @@ router.get('/storage/:resource', (req, res) => {
         const path = `/api/${resource}`; // Ensure proper path format
         console.log('Fetching storage for path:', path);
         const data = StorageManager.getAll(path); // Using static method
-        console.log('Storage data:', data);
+        // console.log('Storage data:', data);
         
         if (!data || !data[`${resource}s`]) {
             // Return empty collection if no data exists

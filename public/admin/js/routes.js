@@ -28,6 +28,7 @@ export class RouteManager {
                 <div class="route-header">
                     <h3>${route.method} ${route.path}</h3>
                     <div class="route-actions">
+                        <button onclick="routeManager.editRoute(${index})" class="edit">Edit</button>
                         <button onclick="routeManager.duplicateRoute(${index})">Duplicate</button>
                         <button onclick="routeManager.deleteRoute(${index})">Delete</button>
                     </div>
@@ -38,6 +39,37 @@ export class RouteManager {
                 >${JSON.stringify(route, null, 2)}</textarea>
             </div>
         `).join('');
+    }
+
+    editRoute(index) {
+        const route = this.routes[index];
+        console.log('Original route before edit:', route);
+        this.modalManager.show(route, (updatedRoute) => {
+            console.log('Updated route from modal:', updatedRoute);
+            
+            // Preserve settings and ensure they're properly structured
+            const mergedRoute = {
+                ...route,                // Keep existing settings
+                ...updatedRoute,         // Apply updates
+                persist: true,
+                method: updatedRoute.method.toUpperCase(),
+                // Preserve error settings
+                error: updatedRoute.error || route.error,
+                // Preserve delay settings
+                delay: updatedRoute.delay || route.delay,
+                // Handle schema validation
+                schema: updatedRoute.schema,
+                validateRequest: (updatedRoute.method === 'POST' || updatedRoute.method === 'PUT') 
+                    && updatedRoute.schema != null
+            };
+
+            console.log('Final merged route:', mergedRoute);
+            this.routes[index] = mergedRoute;
+            
+            this.displayRoutes();
+            this.showUnsavedChanges();
+            showToast('Route updated successfully', 'success');
+        });
     }
 
     // API Methods
@@ -88,6 +120,8 @@ export class RouteManager {
 
     async saveRoutes() {
         try {
+            console.log('Saving routes:', this.routes);
+            
             // Validate each route
             for (const route of this.routes) {
                 try {
@@ -113,6 +147,9 @@ export class RouteManager {
                 const error = await response.json();
                 throw new Error(error.error || 'Failed to save routes');
             }
+
+            const result = await response.json();
+            console.log('Save result:', result);
 
             showToast('Routes saved successfully', 'success');
             await this.loadRoutes();
@@ -177,8 +214,9 @@ export class RouteManager {
         }
 
         try {
-            const template = JSON.parse(formData.template);
-            const schema = formData.schema ? JSON.parse(formData.schema) : null;
+            // Use the response property from formData instead of template
+            const template = formData.response;
+            const schema = formData.schema;
             const resourceName = path.split('/').pop();
             
             const newRoutes = this.generateRoutes(path, resourceName, template, schema, formData);
@@ -210,26 +248,53 @@ export class RouteManager {
     }
 
     generateRoutes(path, resourceName, template, schema, formData) {
+        console.log('Generating routes with formData:', formData);
+        
+        // Common configuration for all routes
         const baseConfig = {
             persist: true,
+            // Apply error simulation settings if enabled
+            ...(formData.error && {
+                error: {
+                    enabled: true,
+                    probability: parseInt(formData.error.probability) || 25,
+                    status: parseInt(formData.error.status) || 500,
+                    message: formData.error.message || 'Simulated error'
+                }
+            }),
+            // Apply delay if enabled
+            ...(formData.delay && { delay: parseInt(formData.delay) })
+        };
+
+        // Configuration for write operations (POST, PUT)
+        const writeConfig = {
+            ...baseConfig,
             schema: schema,
-            error: formData.error,
-            delay: formData.delay
+            validateRequest: true
+        };
+
+        // Configuration for read operations (GET, DELETE)
+        const readConfig = {
+            ...baseConfig,
+            schema: null,
+            validateRequest: false
         };
 
         const newRoutes = [];
 
+        // GET collection
         if (formData.operations.get) {
             newRoutes.push({
-                ...baseConfig,
+                ...readConfig,
                 path: path,
                 method: 'GET',
                 response: { [`${resourceName}s`]: [template] },
                 statusCode: 200
             });
 
+            // GET single item
             newRoutes.push({
-                ...baseConfig,
+                ...readConfig,
                 path: `${path}/:id`,
                 method: 'GET',
                 response: template,
@@ -237,37 +302,41 @@ export class RouteManager {
             });
         }
 
+        // POST new item
         if (formData.operations.post) {
             newRoutes.push({
-                ...baseConfig,
+                ...writeConfig,
                 path: path,
                 method: 'POST',
                 response: template,
-                statusCode: 201,
-                validateRequest: true
+                statusCode: 201
             });
         }
 
+        // PUT update item
         if (formData.operations.put) {
             newRoutes.push({
-                ...baseConfig,
+                ...writeConfig,
                 path: `${path}/:id`,
                 method: 'PUT',
                 response: template,
-                statusCode: 200,
-                validateRequest: true
+                statusCode: 200
             });
         }
 
+        // DELETE item
         if (formData.operations.delete) {
             newRoutes.push({
-                ...baseConfig,
+                ...readConfig,
                 path: `${path}/:id`,
                 method: 'DELETE',
                 response: null,
                 statusCode: 204
             });
         }
+
+        // Log the generated routes for debugging
+        console.log('Generated routes:', JSON.stringify(newRoutes, null, 2));
 
         return newRoutes;
     }

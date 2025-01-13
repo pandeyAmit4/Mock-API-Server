@@ -1,0 +1,10 @@
+.route-actions button.edit {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.route-actions button.edit:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}

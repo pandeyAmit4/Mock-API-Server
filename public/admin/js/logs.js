@@ -70,12 +70,13 @@ export class LogsManager {
     }
 
     updateLogs(newLogs) {
+        // Clear old logs first to ensure we have the latest data
+        this.logs.clear();
         newLogs.forEach(log => {
             const logId = this.getLogId(log);
-            if (!this.logs.has(logId)) {
-                this.logs.set(logId, log);
-            }
+            this.logs.set(logId, log);
         });
+        this.displayLogs(); // Immediately update display after new logs
     }
 
     getLogId(log) {
@@ -111,8 +112,13 @@ export class LogsManager {
     displayLogs() {
         const filteredLogs = this.getFilteredLogs();
         const logsList = document.getElementById('logsList');
+        if (!logsList) return;
         
+        const currentScroll = logsList.scrollTop;
         logsList.innerHTML = filteredLogs.map(log => this.createLogEntry(log)).join('');
+        
+        // Preserve scroll position
+        logsList.scrollTop = currentScroll;
     }
 
     createLogEntry(log) {
@@ -181,7 +187,22 @@ export class LogsManager {
     }
 
     startAutoRefresh() {
-        this.refreshInterval = setInterval(() => this.loadLogs(), 5000);
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+        }
+        
+        // Refresh logs every 2 seconds
+        this.refreshInterval = setInterval(async () => {
+            try {
+                const response = await fetch('/api/admin/logs');
+                if (!response.ok) throw new Error('Failed to fetch logs');
+                const logs = await response.json();
+                this.updateLogs(logs);
+            } catch (error) {
+                console.error('Auto-refresh error:', error);
+                // Don't show toast for auto-refresh errors to avoid spam
+            }
+        }, 2000);
     }
 
     cleanup() {

@@ -137,7 +137,7 @@ class StorageManager {
         store[storeName] = [];
       }
       
-      console.log('Storage data:', store);
+      // console.log('Storage data:', store);
       return store;
     } catch (error) {
       console.error('Error getting storage:', error);

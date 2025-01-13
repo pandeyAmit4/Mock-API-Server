@@ -25,31 +25,34 @@ export async function startServer({
 }) {
     const app = express();
     
+    // Load routes from config file
+    let loadedRoutes = [];
+    try {
+        const configPath = path.join(__dirname, '../config/routes.json');
+        try {
+            const routesData = await fs.readFile(configPath, 'utf8');
+            loadedRoutes = JSON.parse(routesData);
+            console.log(`Loaded ${loadedRoutes.length} routes from config`);
+        } catch (error) {
+            console.log('No existing routes found, using defaults');
+            loadedRoutes = sampleRoutes;
+            // Save sample routes as initial config
+            await fs.writeFile(configPath, JSON.stringify(sampleRoutes, null, 2));
+        }
+    } catch (error) {
+        console.error('Error loading routes:', error);
+    }
+
     app.use(express.json());
     app.use(cors());
     app.use(requestLogger);
 
-    // Initialize settings and routes configuration
+    // Initialize settings
     await loadSettings();
     
-    // Load initial routes configuration
-    try {
-        const configPath = path.join(__dirname, '../config/routes.json');
-        try {
-            const existingRoutes = JSON.parse(await fs.readFile(configPath, 'utf8'));
-            routesConfig = existingRoutes;
-        } catch (error) {
-            console.log('No existing routes found, using defaults');
-            routesConfig = sampleRoutes;
-            await fs.writeFile(configPath, JSON.stringify(sampleRoutes, null, 2));
-        }
-    } catch (error) {
-        console.error('Error loading routes configuration:', error);
-    }
-
-    // Mount admin routes with the current configuration
+    // Mount admin routes with loaded configuration
     app.use('/api/admin', (req, res, next) => {
-        req.routesConfig = routesConfig;  // Make routes available to admin router
+        req.routesConfig = loadedRoutes;
         next();
     }, adminRouter);
 
@@ -179,7 +182,7 @@ export async function startServer({
     });
 
     // Setup Swagger UI
-    const openApiSpec = generateOpenApiSpec(routesConfig, { port });
+    const openApiSpec = generateOpenApiSpec(loadedRoutes, { port });
     app.use('/docs', swaggerUi.serve);
     app.get('/docs', swaggerUi.setup(openApiSpec));
 
@@ -190,7 +193,7 @@ export async function startServer({
     if (reset) StorageManager.resetAll();
 
     // Load dynamic routes last
-    await loadRoutes(app, routesConfig);
+    await loadRoutes(app, loadedRoutes);
 
     // Error handling middleware
     app.use((err, req, res, next) => {
