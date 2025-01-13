@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { validateRouteConfig } from './validation.js';
 import { generateDynamicData } from './dataGenerator.js';
 import { StorageManager } from './storage.js';
+import { SchemaValidator } from './schemaValidator.js';  // Add this import
 import { applyDelay } from './delay.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

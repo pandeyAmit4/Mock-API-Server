@@ -79,6 +79,7 @@ function displayRoutes() {
             <div class="route-header">
                 <h3>${route.method} ${route.path}</h3>
                 <button onclick="deleteRoute(${index})">Delete</button>
+                <button onclick="duplicateRoute(${index})">Duplicate</button>
             </div>
             <textarea
                 class="json-editor"
@@ -88,16 +89,34 @@ function displayRoutes() {
     `).join('');
 }
 
+async function validateRouteConfig(route) {
+    try {
+        const response = await fetch('/api/admin/validate-route', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(route)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message);
+        }
+        
+        return true;
+    } catch (error) {
+        showToast(error.message, 'error');
+        return false;
+    }
+}
+
 async function saveRoutes() {
     try {
-        // Check for duplicates before saving
-        const usedPaths = new Set();
-        for (const route of routes) {
-            const routeKey = `${route.method.toUpperCase()}:${route.path}`;
-            if (usedPaths.has(routeKey)) {
-                throw new Error(`Duplicate route found: ${routeKey}`);
-            }
-            usedPaths.add(routeKey);
+        // Validate all routes before saving
+        const validationResults = await Promise.all(routes.map(validateRouteConfig));
+        if (!validationResults.every(Boolean)) {
+            throw new Error('Route validation failed');
         }
 
         const response = await fetch('/api/admin/routes', {
@@ -242,102 +261,94 @@ function createRoutes() {
         return;
     }
 
-    // Collect advanced settings
-    const errorSettings = document.getElementById('enableError').checked ? {
-        enabled: true,
-        probability: parseInt(document.getElementById('errorProb').value),
-        status: parseInt(document.getElementById('errorStatus').value),
-        message: document.getElementById('errorMessage').value
-    } : undefined;
-
-    const delay = document.getElementById('enableDelay').checked ? 
-        parseInt(document.getElementById('delayMs').value) : undefined;
+    // Enhanced route configuration
+    const baseConfig = {
+        persist: true,
+        schema: schema,
+        error: document.getElementById('enableError').checked ? {
+            enabled: true,
+            probability: parseInt(document.getElementById('errorProb').value),
+            status: parseInt(document.getElementById('errorStatus').value),
+            message: document.getElementById('errorMessage').value
+        } : undefined,
+        delay: document.getElementById('enableDelay').checked ? 
+            parseInt(document.getElementById('delayMs').value) : undefined
+    };
 
     const newRoutes = [];
 
-    // GET (List all)
+    // GET routes with enhanced configuration
     if (document.getElementById('opGet').checked) {
         newRoutes.push({
+            ...baseConfig,
             path: path,
             method: 'GET',
             response: {
-                [`${resourceName}s`]: [template]
+                [`${resourceName}s`]: [template],
+                pagination: {
+                    total: 0,
+                    page: 1,
+                    limit: 10
+                }
             },
-            persist: true,
             statusCode: 200
         });
 
-        // GET (Single item)
         newRoutes.push({
+            ...baseConfig,
             path: `${path}/:id`,
             method: 'GET',
             response: template,
-            persist: true,
             statusCode: 200
         });
     }
 
-    // POST with schema validation
+    // POST route with validation
     if (document.getElementById('opPost').checked) {
         newRoutes.push({
+            ...baseConfig,
             path: path,
             method: 'POST',
             response: template,
-            persist: true,
             statusCode: 201,
-            schema: schema,
-            error: errorSettings,
-            delay: delay
+            validateRequest: true
         });
     }
 
-    // PUT with schema validation
+    // PUT route with validation
     if (document.getElementById('opPut').checked) {
         newRoutes.push({
+            ...baseConfig,
             path: `${path}/:id`,
             method: 'PUT',
             response: template,
-            persist: true,
             statusCode: 200,
-            schema: schema,
-            error: errorSettings,
-            delay: delay
+            validateRequest: true
         });
     }
 
-    // DELETE
+    // DELETE route
     if (document.getElementById('opDelete').checked) {
         newRoutes.push({
+            ...baseConfig,
             path: `${path}/:id`,
             method: 'DELETE',
-            response: null,  // DELETE doesn't need a response template
-            persist: true,
+            response: null,
             statusCode: 204
         });
     }
 
-    // Validate new routes
-    try {
-        for (const route of newRoutes) {
-            if (routes.some(r => 
-                r.path === route.path && 
-                r.method.toUpperCase() === route.method.toUpperCase()
-            )) {
-                throw new Error(`Route ${route.method} ${route.path} already exists`);
+    // Validate all routes before adding
+    Promise.all(newRoutes.map(validateRouteConfig))
+        .then(results => {
+            if (results.every(Boolean)) {
+                routes.unshift(...newRoutes);
+                displayRoutes();
+                showUnsavedChanges();
+                closeModal();
+                showToast(`Created ${newRoutes.length} routes for ${resourceName}`, 'success');
             }
-        }
-    } catch (error) {
-        showToast(error.message, 'error');
-        return;
-    }
-
-    // Add new routes to existing routes
-    routes.unshift(...newRoutes);
-    displayRoutes();
-    showUnsavedChanges();
-    closeModal();
-
-    showToast(`Created ${newRoutes.length} routes for ${resourceName}`, 'success');
+        });
 }
 
 // Add CSS for modal
@@ -830,3 +841,87 @@ document.getElementById('loadSamples').addEventListener('click', loadSampleRoute
 // Initial load
 loadRoutes();
 loadLogs();
+
+// Add new batch operations functions
+function batchDeleteRoutes(indices) {
+    indices.sort((a, b) => b - a); // Delete from end to start
+    indices.forEach(index => routes.splice(index, 1));
+    displayRoutes();
+    showUnsavedChanges();
+    showToast(`${indices.length} routes deleted`, 'warning');
+}
+
+function duplicateRoute(index) {
+    const newRoute = JSON.parse(JSON.stringify(routes[index]));
+    newRoute.path += '_copy';
+    routes.splice(index + 1, 0, newRoute);
+    displayRoutes();
+    showUnsavedChanges();
+    showToast('Route duplicated', 'info');
+}
+
+// Add route search and filter functionality
+function filterRoutes(searchText) {
+    const filteredRoutes = routes.filter(route => 
+        JSON.stringify(route).toLowerCase().includes(searchText.toLowerCase())
+    );
+    displayFilteredRoutes(filteredRoutes);
+}
+
+function displayFilteredRoutes(filteredRoutes) {
+    const routesList = document.getElementById('routesList');
+    // ... implementation similar to displayRoutes but with filtered data
+}
+
+// Add route validation function
+function validateRoute(route) {
+    const required = ['path', 'method', 'response'];
+    const errors = [];
+    
+    required.forEach(field => {
+        if (!route[field]) errors.push(`Missing required field: ${field}`);
+    });
+    
+    if (!route.path.startsWith('/')) {
+        errors.push('Path must start with /');
+    }
+    
+    return errors;
+}
+
+// Add bulk import/export functions
+function exportRoutes() {
+    const blob = new Blob([JSON.stringify(routes, null, 2)], 
+        { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mockapi-routes-${new Date().toISOString()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function importRoutes(file) {
+    try {
+        const content = await file.text();
+        const newRoutes = JSON.parse(content);
+        
+        if (!Array.isArray(newRoutes)) {
+            throw new Error('Invalid routes format');
+        }
+        
+        const errors = newRoutes.flatMap(validateRoute);
+        if (errors.length) {
+            throw new Error(`Validation errors:\n${errors.join('\n')}`);
+        }
+        
+        routes = newRoutes;
+        displayRoutes();
+        showUnsavedChanges();
+        showToast('Routes imported successfully', 'success');
+    } catch (error) {
+        showToast(`Import failed: ${error.message}`, 'error');
+    }
+}

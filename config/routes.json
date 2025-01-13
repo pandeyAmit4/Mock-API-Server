@@ -1,5 +1,60 @@
 [
   {
+    "path": "/api/emp",
+    "method": "GET",
+    "response": {
+      "emps": [
+        {
+          "id": "{{faker.string.uuid}}",
+          "name": "{{faker.commerce.productName}}",
+          "description": "{{faker.commerce.productDescription}}"
+        }
+      ]
+    },
+    "persist": true,
+    "statusCode": 200
+  },
+  {
+    "path": "/api/emp/:id",
+    "method": "GET",
+    "response": {
+      "id": "{{faker.string.uuid}}",
+      "name": "{{faker.commerce.productName}}",
+      "description": "{{faker.commerce.productDescription}}"
+    },
+    "persist": true,
+    "statusCode": 200
+  },
+  {
+    "path": "/api/emp",
+    "method": "POST",
+    "response": {
+      "id": "{{faker.string.uuid}}",
+      "name": "{{faker.commerce.productName}}",
+      "description": "{{faker.commerce.productDescription}}"
+    },
+    "persist": true,
+    "statusCode": 201
+  },
+  {
+    "path": "/api/emp/:id",
+    "method": "PUT",
+    "response": {
+      "id": "{{faker.string.uuid}}",
+      "name": "{{faker.commerce.productName}}",
+      "description": "{{faker.commerce.productDescription}}"
+    },
+    "persist": true,
+    "statusCode": 200
+  },
+  {
+    "path": "/api/emp/:id",
+    "method": "DELETE",
+    "response": null,
+    "persist": true,
+    "statusCode": 204
+  },
+  {
     "path": "/api/users",
     "method": "GET",
     "response": {
