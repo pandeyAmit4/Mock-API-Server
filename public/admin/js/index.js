@@ -100,9 +100,41 @@ class AdminApp {
     }
 }
 
+// Tab switching functionality
+function initializeTabs() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    function switchTab(targetTab) {
+        // Remove active class from all tabs and contents
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+
+        // Add active class to selected tab and content
+        const selectedTab = document.querySelector(`[data-tab="${targetTab}"]`);
+        const selectedContent = document.getElementById(targetTab);
+        
+        if (selectedTab && selectedContent) {
+            selectedTab.classList.add('active');
+            selectedContent.classList.add('active');
+        }
+    }
+
+    // Add click handlers to all tab buttons
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-tab');
+            switchTab(targetTab);
+        });
+    });
+}
+
 // Initialize when DOM is ready
 const app = new AdminApp();
-document.addEventListener('DOMContentLoaded', () => app.init());
+document.addEventListener('DOMContentLoaded', () => {
+    app.init();
+    initializeTabs();
+});
 
 // Export for module usage
 export default app;

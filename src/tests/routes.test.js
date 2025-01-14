@@ -141,6 +141,7 @@ async function runTests() {
   // 5. Error Simulation Tests
   console.log('\nRunning Error Simulation Tests...');
 
+  // Bug: Test is probabilistic and may fail randomly
   test('Should handle error simulation configuration', () => {
     const route = {
         path: '/api/error-test',
@@ -168,6 +169,7 @@ async function runTests() {
         if (shouldError) errorCount++;
     }
 
+    // Should use a seeded random number generator for consistent tests
     const errorRate = (errorCount / iterations) * 100;
     assert.ok(errorRate > 30 && errorRate < 70, 
         `Error rate ${errorRate}% is too far from expected 50%`);

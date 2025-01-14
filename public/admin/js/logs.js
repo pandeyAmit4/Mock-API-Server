@@ -17,7 +17,7 @@ export class LogsManager {
     setupEventListeners() {
         const elements = {
             statusFilter: document.getElementById('statusFilter'),
-            methodFilter: document.getElementById('methodFilter'),
+            methodFilter: document.getElementById('logsMethodFilter'),
             timeFilter: document.getElementById('timeFilter'),
             logsSearch: document.getElementById('logsSearch'),
             clearLogs: document.getElementById('clearLogs'),
@@ -27,19 +27,26 @@ export class LogsManager {
             refreshLogs: document.getElementById('refreshLogs')
         };
 
-        // Only add listeners if elements exist
+        // Immediate filtering for dropdown changes
         if (elements.statusFilter) {
             elements.statusFilter.addEventListener('change', () => this.loadLogs());
         }
+        console.log('Method filter:', elements.methodFilter);
         if (elements.methodFilter) {
-            elements.methodFilter.addEventListener('change', () => this.loadLogs());
+            elements.methodFilter.addEventListener('change', () => {
+                console.log('Method filter changed:', elements.methodFilter.value);
+                this.loadLogs();
+            });
         }
         if (elements.timeFilter) {
             elements.timeFilter.addEventListener('change', () => this.loadLogs());
         }
+
+        // Debounced filtering for search input
         if (elements.logsSearch) {
             elements.logsSearch.addEventListener('input', debounce(() => this.loadLogs(), 300));
         }
+
         if (elements.clearLogs) {
             elements.clearLogs.addEventListener('click', () => this.clearLogs());
         }
@@ -53,7 +60,12 @@ export class LogsManager {
             elements.collapseAll.addEventListener('click', () => this.collapseAllLogs());
         }
         if (elements.refreshLogs) {
-            elements.refreshLogs.addEventListener('click', () => this.refreshLogs());
+            const loader = this.createLoadingIndicator(elements.refreshLogs);
+            loader.start();
+            elements.refreshLogs.addEventListener('click', () => {
+                this.refreshLogs()
+                    .finally(() => loader.stop());
+            });
         }
     }
 
@@ -63,9 +75,9 @@ export class LogsManager {
             if (!response.ok) throw new Error('Failed to load logs');
             const logs = await response.json();
             this.updateLogs(logs);
-            this.displayLogs();
         } catch (error) {
             console.error('Error loading logs:', error);
+            showToast('Error loading logs', 'error');
         }
     }
 
@@ -76,7 +88,7 @@ export class LogsManager {
             const logId = this.getLogId(log);
             this.logs.set(logId, log);
         });
-        this.displayLogs(); // Immediately update display after new logs
+        requestAnimationFrame(() => this.displayLogs()); // Use requestAnimationFrame for smoother updates
     }
 
     getLogId(log) {
@@ -84,26 +96,31 @@ export class LogsManager {
     }
 
     getFilteredLogs() {
-        const filters = {
-            status: document.getElementById('statusFilter').value,
-            method: document.getElementById('methodFilter').value,
-            timeFilter: document.getElementById('timeFilter').value,
-            searchText: document.getElementById('logsSearch').value.toLowerCase()
-        };
+        const statusFilter = document.getElementById('statusFilter')?.value || 'all';
+        const methodFilter = document.getElementById('logsMethodFilter')?.value || 'all';
+        const timeFilter = document.getElementById('timeFilter')?.value || 'all';
+        const searchText = document.getElementById('logsSearch')?.value.toLowerCase() || '';
 
         return Array.from(this.logs.values()).filter(log => {
-            if (filters.status === 'success' && log.status >= 400) return false;
-            if (filters.status === 'error' && log.status < 400) return false;
-            if (filters.method !== 'all' && log.method !== filters.method) return false;
+            // Status filter
+            if (statusFilter === 'success' && log.status >= 400) return false;
+            if (statusFilter === 'error' && log.status < 400) return false;
+            
+            // Method filter - Make sure to match exact method
+            if (methodFilter !== 'all' && log.method !== methodFilter) return false;
 
+            // Time filter
             const logTime = new Date(log.timestamp).getTime();
             const now = Date.now();
-            if (filters.timeFilter === '5m' && now - logTime > 5 * 60 * 1000) return false;
-            if (filters.timeFilter === '15m' && now - logTime > 15 * 60 * 1000) return false;
-            if (filters.timeFilter === '1h' && now - logTime > 60 * 60 * 1000) return false;
-            if (filters.timeFilter === '24h' && now - logTime > 24 * 60 * 1000) return false;
+            switch(timeFilter) {
+                case '5m': if (now - logTime > 5 * 60 * 1000) return false; break;
+                case '15m': if (now - logTime > 15 * 60 * 1000) return false; break;
+                case '1h': if (now - logTime > 60 * 60 * 1000) return false; break;
+                case '24h': if (now - logTime > 24 * 60 * 60 * 1000) return false; break;
+            }
 
-            if (filters.searchText && !JSON.stringify(log).toLowerCase().includes(filters.searchText)) return false;
+            // Text search
+            if (searchText && !JSON.stringify(log).toLowerCase().includes(searchText)) return false;
 
             return true;
         });
@@ -191,16 +208,13 @@ export class LogsManager {
             clearInterval(this.refreshInterval);
         }
         
-        // Refresh logs every 2 seconds
         this.refreshInterval = setInterval(async () => {
             try {
-                const response = await fetch('/api/admin/logs');
-                if (!response.ok) throw new Error('Failed to fetch logs');
-                const logs = await response.json();
-                this.updateLogs(logs);
+                if (document.getElementById('logs').classList.contains('active')) {
+                    await this.loadLogs();
+                }
             } catch (error) {
                 console.error('Auto-refresh error:', error);
-                // Don't show toast for auto-refresh errors to avoid spam
             }
         }, 2000);
     }
@@ -227,11 +241,30 @@ export class LogsManager {
         );
     }
 
-    refreshLogs() {
-        const currentScrollPosition = document.getElementById('logsList').scrollTop;
-        this.loadLogs().then(() => {
-            document.getElementById('logsList').scrollTop = currentScrollPosition;
+    async refreshLogs() {
+        const currentScrollPosition = document.getElementById('logsList')?.scrollTop || 0;
+        await this.loadLogs();
+        requestAnimationFrame(() => {
+            const logsList = document.getElementById('logsList');
+            if (logsList) {
+                logsList.scrollTop = currentScrollPosition;
+            }
         });
+        showToast('Logs refreshed', 'info');
+    }
+
+    createLoadingIndicator(button) {
+        const originalContent = button.innerHTML;
+        return {
+            start: () => {
+                button.disabled = true;
+                button.innerHTML = '<i class="material-icons loading">refresh</i> Refreshing...';
+            },
+            stop: () => {
+                button.disabled = false;
+                button.innerHTML = originalContent;
+            }
+        };
     }
 }
 

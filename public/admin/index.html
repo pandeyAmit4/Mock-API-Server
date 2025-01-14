@@ -3,78 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <title>Mock API Admin</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/js-toast-notifier@1.0.12/dist/index.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/js-toast-notifier@1.0.12/dist/index.umd.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>Mock API Admin Panel</h1>
-        
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="routes">Routes</button>
-            <button class="tab-btn" data-tab="storage">Storage</button>
-            <button class="tab-btn" data-tab="logs">Logs</button>
-        </div>
-
-        <div id="routes" class="tab-content active">
-            <h2>Routes Configuration</h2>
-            <div class="header-actions">
-                <button id="addRoute">Add Route</button>
-                <button id="loadSamples">Load Samples</button>
+    <div class="admin-container">
+        <header class="main-header">
+            <div class="header-content">
+                <h1><i class="material-icons">api</i> Mock API Admin</h1>
+                <div class="global-actions">
+                    <button class="btn btn-secondary" id="importConfig">
+                        <i class="material-icons">upload</i> Import
+                    </button>
+                    <button class="btn btn-secondary" id="exportConfig">
+                        <i class="material-icons">download</i> Export
+                    </button>
+                </div>
             </div>
-            <div id="routesList"></div>
-        </div>
+        </header>
 
-        <div id="storage" class="tab-content">
-            <h2>Storage Management</h2>
-            <div class="storage-actions">
-                <button onclick="storageManager.resetStorage('/api/users')">Reset Users</button>
-                <button onclick="storageManager.resetStorage('/api/products')">Reset Products</button>
-                <button onclick="storageManager.resetStorage('/api/blog-posts')">Reset Blog Posts</button>
+        <div class="tabs-container">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="routes">
+                    <i class="material-icons">route</i> Routes
+                </button>
+                <button class="tab-btn" data-tab="storage">
+                    <i class="material-icons">storage</i> Storage
+                </button>
+                <button class="tab-btn" data-tab="versions">
+                    <i class="material-icons">history</i> Versions
+                </button>
+                <button class="tab-btn" data-tab="logs">
+                    <i class="material-icons">list_alt</i> Logs
+                </button>
             </div>
         </div>
 
-        <div id="logs" class="tab-content">
-            <h2>Request Logs</h2>
-            <div class="logs-controls">
-                <div class="logs-filter">
-                    <select id="statusFilter" class="logs-select">
-                        <option value="all">All Status</option>
-                        <option value="success">Success (2xx)</option>
-                        <option value="error">Error (4xx/5xx)</option>
-                    </select>
-                    <select id="methodFilter" class="logs-select">
+        <div class="tab-content-container">
+            <!-- Routes Tab -->
+            <div id="routes" class="tab-content active">
+                <div class="section-header">
+                    <h2>Routes Configuration</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" id="addRoute">
+                            <i class="material-icons">add</i> Add Route
+                        </button>
+                        <button class="btn btn-secondary" id="loadSamples">
+                            <i class="material-icons">playlist_add</i> Load Samples
+                        </button>
+                    </div>
+                </div>
+
+                <div class="route-filters">
+                    <input type="text" class="route-search" placeholder="Search routes..." id="routeSearch">
+                    <select class="form-control" id="routeMethodFilter">
                         <option value="all">All Methods</option>
                         <option value="GET">GET</option>
                         <option value="POST">POST</option>
                         <option value="PUT">PUT</option>
                         <option value="DELETE">DELETE</option>
                     </select>
-                    <select id="timeFilter" class="logs-select">
-                        <option value="all">All Time</option>
-                        <option value="5m">Last 5 minutes</option>
-                        <option value="15m">Last 15 minutes</option>
-                        <option value="1h">Last hour</option>
-                        <option value="24h">Last 24 hours</option>
-                    </select>
                 </div>
-                <input type="text" id="logsSearch" placeholder="Search logs..." class="logs-search">
-            </div>
-            <div class="logs-actions">
-                <button id="clearLogs">Clear Logs</button>
-                <button id="refreshLogs">Refresh</button>
-                <button id="expandAll">Expand All</button>
-                <button id="collapseAll">Collapse All</button>
-                <button id="exportLogs">Export Logs</button>
-            </div>
-            <div id="logsList" class="logs-list"></div>
-        </div>
-    </div>
 
-    <div class="sticky-footer">
-        <span id="unsavedIndicator" class="unsaved-changes" style="display: none;">Unsaved Changes!</span>
-        <button id="saveRoutes" class="save-button">Save Routes</button>
+                <div id="routesList" class="routes-grid"></div>
+                
+                <button class="add-route-button" id="addRouteFloat">
+                    <i class="material-icons">add</i>
+                </button>
+            </div>
+
+            <!-- Storage Tab -->
+            <div id="storage" class="tab-content">
+                <div class="section-header">
+                    <h2><i class="material-icons">storage</i> Storage Management</h2>
+                    <button class="btn btn-primary" id="refreshStorage">
+                        <i class="material-icons">refresh</i> Refresh Data
+                    </button>
+                </div>
+
+                <div class="storage-container">
+                    <!-- Storage sections will be dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Versions Tab -->
+            <div id="versions" class="tab-content">
+                <h2>Version History</h2>
+                <div class="version-controls">
+                    <button id="refreshVersions" class="btn btn-primary">
+                        <i class="material-icons">refresh</i> Refresh
+                    </button>
+                </div>
+                <div id="versionHistory" class="version-history"></div>
+                <div id="versionDiff" class="version-diff" style="display: none;">
+                    <h3>Changes</h3>
+                    <div class="diff-content"></div>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="logs" class="tab-content">
+                <h2>Request Logs</h2>
+                <div class="logs-controls">
+                    <div class="logs-filter">
+                        <select id="statusFilter" class="logs-select">
+                            <option value="all">All Status</option>
+                            <option value="success">Success (2xx)</option>
+                            <option value="error">Error (4xx/5xx)</option>
+                        </select>
+                        <select id="logsMethodFilter" class="logs-select">
+                            <option value="all">All Methods</option>
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                        <select id="timeFilter" class="logs-select">
+                            <option value="all">All Time</option>
+                            <option value="5m">Last 5 minutes</option>
+                            <option value="15m">Last 15 minutes</option>
+                            <option value="1h">Last hour</option>
+                            <option value="24h">Last 24 hours</option>
+                        </select>
+                    </div>
+                    <input type="text" id="logsSearch" placeholder="Search logs..." class="logs-search">
+                </div>
+                <div class="logs-actions">
+                    <button class="btn" id="clearLogs">
+                        <i class="material-icons">delete</i> Clear
+                    </button>
+                    <button class="btn" id="refreshLogs">
+                        <i class="material-icons">refresh</i> Refresh
+                    </button>
+                    <button class="btn" id="expandAll">
+                        <i class="material-icons">unfold_more</i> Expand All
+                    </button>
+                    <button class="btn" id="collapseAll">
+                        <i class="material-icons">unfold_less</i> Collapse All
+                    </button>
+                    <button class="btn" id="exportLogs">
+                        <i class="material-icons">download</i> Export
+                    </button>
+                </div>
+                <div id="logsList" class="logs-list"></div>
+            </div>
+        </div>
+
+        <footer class="sticky-footer">
+            <div class="footer-content">
+                <span id="unsavedIndicator" class="unsaved-changes">
+                    <i class="material-icons">warning</i> Unsaved Changes
+                </span>
+                <button id="saveRoutes" class="btn btn-success">
+                    <i class="material-icons">save</i> Save Changes
+                </button>
+            </div>
+        </footer>
     </div>
     <script type="module" src="js/index.js"></script>
-</body></html>
+</body>
+</html>

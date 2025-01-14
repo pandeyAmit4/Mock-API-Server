@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import { sampleRoutes } from '../config/sampleRoutes.js';
 import { logger } from '../utils/logger.js';
+import { versionControl } from '../utils/versionControl.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = express.Router();
@@ -244,6 +245,53 @@ router.delete('/logs', (req, res) => {
         res.json({ success: true, message: 'Logs cleared successfully' });
     } catch (error) {
         res.status(500).json({ error: true, message: error.message });
+    }
+});
+
+// Add version control endpoints
+router.get('/versions', (req, res) => {
+    try {
+        const history = versionControl.getVersionHistory();
+        res.json(history);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/versions', async (req, res) => {
+    try {
+        const { routes, description } = req.body;
+        const version = await versionControl.saveVersion(routes, description);
+        res.json(version);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/versions/:hash/rollback', async (req, res) => {
+    try {
+        const routes = await versionControl.rollback(req.params.hash);
+        
+        // Update config file
+        const configPath = path.join(__dirname, '../../config/routes.json');
+        await fs.writeFile(configPath, JSON.stringify(routes, null, 2));
+        
+        // Reload routes
+        await loadRoutes(req.app, routes);
+        
+        res.json(routes);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/versions/:hash/diff', async (req, res) => {
+    try {
+        const currentVersion = versionControl.getCurrentVersion();
+        const diff = versionControl.diffVersions(currentVersion.hash, req.params.hash);
+        res.json(diff);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 

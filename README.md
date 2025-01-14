@@ -19,13 +19,15 @@ A flexible and feature-rich mock API server for development and testing.
 ## Features
 
 ### Core Features
-- Dynamic route configuration via JSON
-- Support for all HTTP methods (GET, POST, PUT, DELETE, PATCH)
-- Persistent data storage with automatic ID generation
-- Data validation with JSON schemas
-- Customizable response delays
-- CORS support
-- Detailed request logging
+### Core Features
+- 🚀 Real-time route management via modern admin UI
+- 📊 Dynamic data generation with Faker.js
+- 🔄 Persistent data storage with auto-save
+- 🔍 Schema validation
+- 🚨 Customizable error simulation
+- 📝 Request logging with advanced filtering
+- 📜 Version control for routes
+- 💾 Import/Export configurations
 
 ### Dynamic Data Generation
 - Integration with Faker.js for realistic data
@@ -40,14 +42,6 @@ A flexible and feature-rich mock API server for development and testing.
 - Custom error messages and status codes
 - Per-route error configuration
 
-### Admin Interface
-- Visual route management
-- Real-time log viewer with filtering
-- Export logs functionality
-- Route validation
-- Unsaved changes warning
-- Storage reset capability
-
 ### API Documentation
 - Interactive API documentation via Swagger UI
 - OpenAPI 3.0.0 specification
@@ -59,16 +53,13 @@ A flexible and feature-rich mock API server for development and testing.
 ## Quick Start
 
 ```bash
-# Installation
-git clone https://github.com/yourusername/mockflow.git
-cd mockflow
+# Install dependencies
 npm install
+
+# Start the server
 npm start
 
-# Development mode
-npm run dev
-
-# Access Admin Panel
+# Access admin panel
 open http://localhost:3000/admin
 ```
 
@@ -101,8 +92,8 @@ open http://localhost:3000/admin
 Full example with all available options:
 ```json
 {
-  "path": "/api/users",          // Route path (supports parameters like :id)
-  "method": "GET",              // HTTP method
+  "path": "/api/users",
+  "method": "GET",
   "response": {
     "users": [{
       "id": "{{faker.string.uuid}}",
@@ -110,10 +101,8 @@ Full example with all available options:
       "email": "{{faker.internet.email}}"
     }]
   },
-  "persist": true,             // Enable in-memory storage
-  "statusCode": 200,           // HTTP status code
-  "delay": 1000,              // Response delay in milliseconds
-  "schema": {                  // Validation schema for POST/PUT
+  "persist": true,
+  "schema": {
     "name": "string",
     "email": "string"
   },
@@ -121,7 +110,7 @@ Full example with all available options:
     "enabled": true,
     "probability": 25,
     "status": 503,
-    "message": "Service Temporarily Unavailable"
+    "message": "Service Unavailable"
   }
 }
 ```
@@ -138,35 +127,39 @@ Full example with all available options:
 }
 ```
 
-## Admin Panel
-
-### Features
+### Admin Interface
 1. Route Management
-   - View all routes
-   - Add new routes
-   - Edit existing routes
-   - Delete routes
-   - Real-time JSON validation
-   - Unsaved changes warning
-   - Duplicate route detection
-   - Error simulation configuration
+   - Visual route editor
+   - Route filtering and search
+   - Batch operations
+   - Sample routes loading
+   - Schema validation
+   - Error simulation settings
    - Auto-save warning
 
 2. Storage Management
-   - Reset storage for specific endpoints
-   - View current storage state
-   - Manage persistence
+   - Per-endpoint data management
+   - Data reset capabilities
+   - Storage inspection
+   - Storage statistics
+   - Persistent data control
 
-3. Log Viewer
+3. Version Control
+   - Automatic versioning
+   - Visual diff viewer
+   - Version rollback
+   - Version metadata
+
+4. Request Logs
    - Real-time log updates
-   - Filter by:
-     - Status (success/error)
-     - HTTP method
-     - Time range (5m, 15m, 1h, 24h)
+   - Advanced filtering:
+     - Status codes
+     - HTTP methods
+     - Time ranges
      - Text search
    - Expandable log details
-   - Export filtered logs
-   - Clear logs functionality
+   - Log export
+   - Auto-refresh
 
 ### Usage
 1. Access: `http://localhost:3000/admin`
@@ -195,12 +188,13 @@ Full example with all available options:
 
 ### Admin API Endpoints
 ```
-GET    /admin              - Admin interface
-GET    /api/admin/routes   - Get routes configuration
-POST   /api/admin/routes   - Update routes configuration
-POST   /api/admin/reset/:path  - Reset storage for path
+GET    /api/admin/routes   - Get all routes
+POST   /api/admin/routes   - Update routes
 GET    /api/admin/logs     - Get request logs
 DELETE /api/admin/logs     - Clear logs
+GET    /api/admin/versions - Get version history
+POST   /api/admin/versions - Save new version
+POST   /api/admin/versions/:hash/rollback - Rollback to version
 ```
 
 ### Dynamic Route Parameters
@@ -251,13 +245,6 @@ DELETE /api/admin/logs     - Clear logs
   }
 }
 ```
-
-### Validation Rules
-- Required fields must be present
-- Types must match exactly
-- Auto fields are skipped in validation
-- Invalid data returns 400 error
-
 ## Storage Management
 
 ### Persistence Options
@@ -267,17 +254,6 @@ DELETE /api/admin/logs     - Clear logs
   "persist": false          // Generate new data each time
 }
 ```
-
-### Storage Operations
-1. GET: Retrieve stored data
-2. POST: Add new data (generates ID)
-3. PUT: Update existing data
-4. DELETE: Remove data
-
-### Storage Reset
-- Via Admin Panel buttons
-- Via API endpoint
-- Automatic reset on server restart
 
 ## Error Handling
 
@@ -299,18 +275,6 @@ DELETE /api/admin/logs     - Clear logs
 
 ## Development Guide
 
-### Project Structure
-```
-mockflow/
-├── config/              # Configuration files
-├── public/admin/        # Admin interface
-├── src/
-│   ├── middleware/     # Express middleware
-│   ├── utils/          # Utilities
-│   ├── tests/         # Test files
-│   └── index.js       # Entry point
-```
-
 ### Testing
 ```bash
 # Run all tests
@@ -321,11 +285,6 @@ npm run test:watch
 ```
 
 ## CLI Usage
-
-Install globally:
-```bash
-npm install -g @yourusername/mock-api-server
-```
 
 Start server:
 ```bash
@@ -386,33 +345,6 @@ The OpenAPI specification is automatically generated from your routes configurat
 - Error responses
 - Example values
 - Validation rules
-
-Example route with documentation:
-```json
-{
-  "path": "/api/users/:id",
-  "method": "GET",
-  "response": {
-    "id": "{{faker.string.uuid}}",
-    "name": "{{faker.person.fullName}}"
-  },
-  "persist": true,
-  "statusCode": 200,
-  "error": {
-    "enabled": true,
-    "probability": 25,
-    "status": 503,
-    "message": "Service Temporarily Unavailable"
-  }
-}
-```
-
-This route will generate documentation including:
-- Path parameter `:id`
-- Success response schema
-- Error response (503)
-- Example values from Faker.js
-- Response format
 
 ## Plugin System
 
@@ -482,21 +414,6 @@ class LoggingPlugin extends BasePlugin {
 
 MIT License
 
-## Recent Updates
-
-### Route Management
-- Improved route validation logic
-- Added support for multiple methods on same path
-- Validation only triggers on save
-- Centralized save button in sticky footer
-- Added sample routes loading feature
-
-### UI Improvements
-- Sticky footer with save button
-- Sample routes loading button
-- Better error handling and validation
-- Improved duplicate route detection
-
 ### Route Configuration
 Example with all features:
 ```json
@@ -559,34 +476,3 @@ Example with all features:
 ✅ Validation errors
 ✅ Not found handling
 ✅ Schema validation
-
-### Route Configuration Example
-```json
-{
-  "path": "/api/products",
-  "method": "GET",
-  "response": {
-    "products": [{
-      "id": "{{faker.string.uuid}}",
-      "name": "{{faker.commerce.productName}}",
-      "price": "{{faker.commerce.price}}",
-      "rating": "{{faker.number.float({ min: 1, max: 5, multipleOf: 0.1 })}}"
-    }]
-  },
-  "persist": true,
-  "schema": {
-    "name": "string",
-    "price": "number"
-  },
-  "statusCode": 200,
-  "delay": 1000
-}
-```
-
-### Validation Rules
-- All routes must have path and method
-- Persistent routes require proper schema
-- Error simulation needs probability and status
-- Path parameters require matching response fields
-- Proper typing for all schema fields
-- No duplicate route combinations

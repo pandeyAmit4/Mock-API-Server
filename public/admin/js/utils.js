@@ -50,6 +50,11 @@ export function deepClone(obj) {
 }
 
 export function sanitizePath(path) {
+    // Bug: Doesn't handle null/undefined paths
+    // Should add type check
+    if (typeof path !== 'string') {
+        throw new Error('Path must be a string');
+    }
     return path.replace(/\/+/g, '/').replace(/\/$/, '');
 }
 
@@ -120,10 +125,94 @@ export function handleApiError(error) {
     showToast(error.message || 'An unexpected error occurred', 'error');
 }
 
-export function createLoadingIndicator(element) {
-    const loader = document.createElement('div');
-    loader.className = 'loading-indicator';
-    loader.textContent = 'Loading...';
-    element.appendChild(loader);
-    return () => loader.remove();
+export function createLoadingIndicator(element, options = {}) {
+    const isButton = element.tagName.toLowerCase() === 'button';
+    const spinner = document.createElement('span');
+    spinner.className = 'loading-indicator';
+    
+    if (isButton) {
+        const originalContent = element.innerHTML;
+        return {
+            start: () => {
+                element.disabled = true;
+                element.prepend(spinner);
+                element.classList.add('loading');
+            },
+            stop: () => {
+                element.disabled = false;
+                element.innerHTML = originalContent;
+                element.classList.remove('loading');
+            }
+        };
+    } else {
+        spinner.textContent = options.text || 'Loading...';
+        return {
+            start: () => {
+                element.appendChild(spinner);
+                element.classList.add('loading');
+            },
+            stop: () => {
+                spinner.remove();
+                element.classList.remove('loading');
+            }
+        };
+    }
+}
+
+export function addButtonFeedback(button) {
+    button.addEventListener('click', function(e) {
+        const rect = button.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple';
+        ripple.style.left = `${x}px`;
+        ripple.style.top = `${y}px`;
+        
+        button.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 1000);
+    });
+}
+
+export function exportConfiguration() {
+    // Get routeManager from the global scope if not passed directly
+    const routeManager = window.routeManager;
+    if (!routeManager) {
+        throw new Error('Route manager not initialized');
+    }
+
+    const config = {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        routes: routeManager.routes,
+        metadata: {
+            routeCount: routeManager.routes.length,
+            exportedBy: 'Mock API Admin'
+        }
+    };
+    
+    downloadJson(config, `mockapi-config-${new Date().toISOString()}.json`);
+}
+
+export async function importConfiguration(file) {
+    try {
+        const config = await readJsonFile(file);
+        
+        // Validate configuration file
+        if (!config.routes || !Array.isArray(config.routes)) {
+            throw new Error('Invalid configuration file format');
+        }
+
+        // Validate each route
+        for (const route of config.routes) {
+            if (!route.path || !route.method) {
+                throw new Error('Invalid route configuration found');
+            }
+        }
+
+        return config.routes;
+    } catch (error) {
+        throw new Error(`Failed to import configuration: ${error.message}`);
+    }
 }

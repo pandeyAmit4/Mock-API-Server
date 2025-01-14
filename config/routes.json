@@ -71,19 +71,7 @@
     },
     "persist": true,
     "statusCode": 201,
-    "validateRequest": true,
-    "schema": {
-      "name": "string",
-      "email": "string",
-      "role": "string"
-    },
-    "error": {
-      "enabled": true,
-      "probability": 25,
-      "status": 500,
-      "message": "Simulated error"
-    },
-    "delay": 1000
+    "validateRequest": true
   },
   {
     "path": "/api/users/:id",

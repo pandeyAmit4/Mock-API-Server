@@ -1,8 +1,10 @@
 export class RouteValidator {
     static isDuplicateRoute(routes, newRoute) {
+        // Bug: Method comparison should happen before toUpperCase()
+        // Current: route.method.toUpperCase() could throw if method is undefined
         return routes.some(route => 
             route.path === newRoute.path && 
-            route.method.toUpperCase() === newRoute.method.toUpperCase()
+            route.method?.toUpperCase() === newRoute.method?.toUpperCase()
         );
     }
 

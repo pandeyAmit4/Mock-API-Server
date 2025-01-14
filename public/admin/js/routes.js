@@ -1,5 +1,5 @@
 import { showToast } from './toast.js';
-import { validateRouteConfig } from './utils.js';
+import { validateRouteConfig, exportConfiguration, importConfiguration } from './utils.js';
 import { ModalManager } from './modal.js';
 
 export class RouteManager {
@@ -7,38 +7,83 @@ export class RouteManager {
         this.routes = [];
         this.hasUnsavedChanges = false;
         this.modalManager = new ModalManager();
+        this.versionHistory = [];
+        this.filterTimeout = null;
     }
 
     init() {
         this.loadRoutes();
         this.setupEventListeners();
+        // Load initial version history if on versions tab
+        if (document.querySelector('[data-tab="versions"].active')) {
+            this.loadVersionHistory();
+        }
     }
 
     setupEventListeners() {
         document.getElementById('saveRoutes').addEventListener('click', () => this.saveRoutes());
         document.getElementById('addRoute').addEventListener('click', () => this.addRoute());
         document.getElementById('loadSamples').addEventListener('click', () => this.loadSampleRoutes());
+        
+        document.getElementById('refreshVersions')?.addEventListener('click', () => {
+            this.loadVersionHistory();
+        });
+
+        // Load version history when switching to versions tab
+        document.querySelector('[data-tab="versions"]')?.addEventListener('click', () => {
+            this.loadVersionHistory();
+        });
+
+        // Add filter listeners
+        const routeSearch = document.getElementById('routeSearch');
+        const methodFilter = document.getElementById('routeMethodFilter');
+        
+        if (routeSearch) {
+            routeSearch.addEventListener('input', () => this.applyFilters());
+        }
+        
+        if (methodFilter) {
+            methodFilter.addEventListener('change', () => this.applyFilters());
+        }
+
+        // Add floating button listener
+        const addRouteFloat = document.getElementById('addRouteFloat');
+        if (addRouteFloat) {
+            addRouteFloat.addEventListener('click', () => this.modalManager.show());
+        }
+
+        // Add import/export handlers
+        document.getElementById('importConfig').addEventListener('click', () => this.importRoutes());
+        document.getElementById('exportConfig').addEventListener('click', () => this.exportRoutes());
+    }
+
+    applyFilters() {
+        clearTimeout(this.filterTimeout);
+        this.filterTimeout = setTimeout(() => {
+            const searchText = document.getElementById('routeSearch')?.value?.toLowerCase() || '';
+            const methodFilter = document.getElementById('routeMethodFilter')?.value || 'all';
+            
+            const filteredRoutes = this.routes.filter(route => {
+                const matchesSearch = JSON.stringify(route).toLowerCase().includes(searchText);
+                const matchesMethod = methodFilter === 'all' || route.method === methodFilter;
+                return matchesSearch && matchesMethod;
+            });
+
+            this.displayFilteredRoutes(filteredRoutes);
+        }, 300);
+    }
+
+    displayFilteredRoutes(routes) {
+        const routesList = document.getElementById('routesList');
+        if (routesList) {
+            routesList.innerHTML = routes.map(route => createRouteItem(route)).join('');
+        }
     }
 
     // Display and Update Methods
     displayRoutes() {
         const routesList = document.getElementById('routesList');
-        routesList.innerHTML = this.routes.map((route, index) => `
-            <div class="route-item" id="route-${index}">
-                <div class="route-header">
-                    <h3>${route.method} ${route.path}</h3>
-                    <div class="route-actions">
-                        <button onclick="routeManager.editRoute(${index})" class="edit">Edit</button>
-                        <button onclick="routeManager.duplicateRoute(${index})">Duplicate</button>
-                        <button onclick="routeManager.deleteRoute(${index})">Delete</button>
-                    </div>
-                </div>
-                <textarea
-                    class="json-editor"
-                    onchange="routeManager.updateRoute(${index}, this.value)"
-                >${JSON.stringify(route, null, 2)}</textarea>
-            </div>
-        `).join('');
+        routesList.innerHTML = this.routes.map((route, index) => createRouteItem(route)).join('');
     }
 
     editRoute(index) {
@@ -151,6 +196,18 @@ export class RouteManager {
             const result = await response.json();
             console.log('Save result:', result);
 
+            // Save version after successful save
+            await fetch('/api/admin/versions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    routes: this.routes,
+                    description: `Manual save - ${new Date().toLocaleString()}`
+                })
+            });
+
             showToast('Routes saved successfully', 'success');
             await this.loadRoutes();
             this.hideUnsavedChanges();
@@ -158,6 +215,106 @@ export class RouteManager {
             console.error('Save error:', error);
             showToast(error.message, 'error');
         }
+    }
+
+    async loadVersionHistory() {
+        try {
+            const response = await fetch('/api/admin/versions');
+            this.versionHistory = await response.json();
+            this.displayVersionHistory();
+        } catch (error) {
+            console.error('Error loading version history:', error);
+        }
+    }
+
+    displayVersionHistory() {
+        const historyList = document.getElementById('versionHistory');
+        if (!historyList) return;
+
+        historyList.innerHTML = this.versionHistory.map(version => `
+            <div class="version-item ${version.isCurrent ? 'current' : ''}">
+                <div class="version-header">
+                    <span class="version-hash">${version.shortHash}</span>
+                    <span class="version-time">${version.timestamp}</span>
+                </div>
+                <div class="version-description">${version.description}</div>
+                <div class="version-routes">
+                    ${version.metadata.routePaths ? version.metadata.routePaths.join(', ') : ''}
+                </div>
+                <div class="version-actions">
+                    <button onclick="routeManager.rollbackVersion('${version.hash}')"
+                            ${version.isCurrent ? 'disabled' : ''}>
+                        Rollback
+                    </button>
+                    <button onclick="routeManager.viewVersionDiff('${version.hash}')">
+                        View Changes
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async rollbackVersion(hash) {
+        try {
+            const response = await fetch(`/api/admin/versions/${hash}/rollback`, {
+                method: 'POST'
+            });
+            
+            if (!response.ok) throw new Error('Failed to rollback');
+            
+            const routes = await response.json();
+            this.routes = routes;
+            this.displayRoutes();
+            this.showUnsavedChanges();
+            showToast('Rolled back to previous version', 'success');
+            await this.loadVersionHistory();
+        } catch (error) {
+            showToast('Failed to rollback: ' + error.message, 'error');
+        }
+    }
+
+    async viewVersionDiff(hash) {
+        try {
+            const response = await fetch(`/api/admin/versions/${hash}/diff`);
+            const diff = await response.json();
+            this.displayDiff(diff);
+        } catch (error) {
+            showToast('Failed to load diff: ' + error.message, 'error');
+        }
+    }
+
+    displayDiff(diff) {
+        const diffContent = document.querySelector('.diff-content');
+        const versionDiff = document.getElementById('versionDiff');
+        
+        let html = '';
+        
+        if (diff.added.length) {
+            html += '<div class="diff-added"><h4>Added Routes:</h4>';
+            diff.added.forEach(route => {
+                html += `<div>${route.method} ${route.path}</div>`;
+            });
+            html += '</div>';
+        }
+        
+        if (diff.removed.length) {
+            html += '<div class="diff-removed"><h4>Removed Routes:</h4>';
+            diff.removed.forEach(route => {
+                html += `<div>${route.method} ${route.path}</div>`;
+            });
+            html += '</div>';
+        }
+        
+        if (diff.modified.length) {
+            html += '<div class="diff-modified"><h4>Modified Routes:</h4>';
+            diff.modified.forEach(change => {
+                html += `<div>${change.from.method} ${change.from.path}</div>`;
+            });
+            html += '</div>';
+        }
+        
+        diffContent.innerHTML = html;
+        versionDiff.style.display = 'block';
     }
 
     // Route Management Methods
@@ -340,6 +497,101 @@ export class RouteManager {
 
         return newRoutes;
     }
+
+    async importRoutes() {
+        try {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                try {
+                    const routes = await importConfiguration(file);
+                    
+                    // Validate all routes before importing
+                    for (const route of routes) {
+                        await validateRouteConfig(route, true);
+                    }
+
+                    this.routes = routes;
+                    this.displayRoutes();
+                    this.showUnsavedChanges();
+                    showToast(`Successfully imported ${routes.length} routes`, 'success');
+                } catch (error) {
+                    showToast(error.message, 'error');
+                }
+            };
+
+            input.click();
+        } catch (error) {
+            console.error('Import error:', error);
+            showToast('Failed to import routes: ' + error.message, 'error');
+        }
+    }
+
+    exportRoutes() {
+        try {
+            exportConfiguration();
+            showToast('Configuration exported successfully', 'success');
+        } catch (error) {
+            console.error('Export error:', error);
+            showToast('Failed to export routes: ' + error.message, 'error');
+        }
+    }
+}
+
+function createRouteItem(route) {
+    return `
+        <div class="route-item">
+            <div class="route-header">
+                <div class="route-path">
+                    <span class="method-badge method-${route.method.toLowerCase()}">${route.method}</span>
+                    <span>${route.path}</span>
+                </div>
+                <div class="route-actions">
+                    <button class="btn btn-primary" onclick="routeManager.editRoute('${route.id}')">
+                        <i class="material-icons">edit</i>
+                        Edit
+                    </button>
+                    <button class="btn btn-danger" onclick="routeManager.deleteRoute('${route.id}')">
+                        <i class="material-icons">delete</i>
+                        Delete
+                    </button>
+                </div>
+            </div>
+            
+            <div class="route-content">
+                <div class="route-section">
+                    <h4>Response</h4>
+                    <pre class="route-response">${JSON.stringify(route.response, null, 2)}</pre>
+                </div>
+                
+                ${route.error?.enabled ? `
+                <div class="route-section">
+                    <h4>Error Simulation</h4>
+                    <div class="route-error-config">
+                        <div class="error-probability">
+                            <span>Probability: ${route.error.probability}%</span>
+                            <input type="range" class="probability-slider" 
+                                value="${route.error.probability}" 
+                                min="0" max="100" disabled>
+                        </div>
+                        <div>Status: ${route.error.status}</div>
+                        <div>Message: ${route.error.message}</div>
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+            
+            <div class="route-meta">
+                <span>Created: ${new Date(route.createdAt).toLocaleDateString()}</span>
+                <span>Last Modified: ${new Date(route.updatedAt).toLocaleDateString()}</span>
+            </div>
+        </div>
+    `;
 }
 
 export const routeManager = new RouteManager();
