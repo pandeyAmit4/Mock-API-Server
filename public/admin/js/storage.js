@@ -1,4 +1,5 @@
 import { showToast } from './toast.js';
+import { DOMUpdater } from './utils/domUpdater.js';
 
 export class StorageManager {
     constructor() {
@@ -47,30 +48,66 @@ export class StorageManager {
         persistentRoutes.forEach(path => this.updateStorageDetails(path));
     }
 
-    async updateStorageDetails(path) {
+    async updateStorageDetails(path, previousData = null) {
         try {
+            const resource = path.split('/').pop()
+                .replace(/([a-z])([A-Z])/g, '$1-$2')
+                .toLowerCase();
+                
             const cleanPath = path.replace(/^\/api\//, '');
             const response = await fetch(`/api/admin/storage/${cleanPath}`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch storage info');
-            }
+            if (!response.ok) throw new Error('Failed to fetch storage info');
             const data = await response.json();
-            const key = path.split('/').pop() + 's';
-            const itemCount = Array.isArray(data[key]) ? data[key].length : 0;
-
+            const resourceKey = `${resource}s`;
+            const currentData = data[resourceKey] || [];
+            
             const detailsDiv = document.getElementById(`storage-${path.replace(/\//g, '-')}`);
-            if (detailsDiv) {
+            if (!detailsDiv) return;
+
+            // First time load
+            if (!detailsDiv.querySelector('.storage-stats')) {
                 detailsDiv.innerHTML = `
                     <div class="storage-stats">
-                        <p>Items: ${itemCount}</p>
-                        <p>Last Updated: ${new Date().toLocaleTimeString()}</p>
-                        <p class="storage-path">Path: ${path}</p>
+                        <div class="stat-item">
+                            <p>Total Items: ${currentData.length}</p>
+                            <p>Last Updated: ${new Date().toLocaleTimeString()}</p>
+                        </div>
                     </div>
                     <div class="storage-preview">
-                        <pre>${itemCount > 0 ? JSON.stringify(data[key][0], null, 2) : 'No items'}</pre>
+                        <pre></pre>
                     </div>
                 `;
             }
+
+            // Update stats if count changed
+            const statsDiv = detailsDiv.querySelector('.storage-stats');
+            const previewDiv = detailsDiv.querySelector('.storage-preview pre');
+            
+            if (statsDiv) {
+                statsDiv.innerHTML = this.createStatsHTML(currentData);
+            }
+
+            // Use DOMUpdater to calculate changes
+            const prevItems = previousData ? previousData[resourceKey] || [] : [];
+            const changes = DOMUpdater.calculateUpdates(prevItems, currentData, 'id');
+
+            // Only update content if there are actual changes
+            if (changes.added.length || changes.modified.length || changes.removed.length) {
+                const formattedData = JSON.stringify(currentData, null, 2);
+                if (previewDiv && previewDiv.textContent !== formattedData) {
+                    // Use requestAnimationFrame for smooth updates
+                    requestAnimationFrame(() => {
+                        const scrollPos = previewDiv.scrollTop;
+                        previewDiv.innerHTML = formattedData;
+                        previewDiv.scrollTop = scrollPos;
+                    });
+                }
+            }
+
+            // Cache current data for next comparison
+            detailsDiv.dataset.previousData = JSON.stringify(data);
+            
+            return data;
         } catch (error) {
             console.error(`Error fetching storage details for ${path}:`, error);
             const detailsDiv = document.getElementById(`storage-${path.replace(/\//g, '-')}`);
@@ -78,6 +115,15 @@ export class StorageManager {
                 detailsDiv.innerHTML = `<p class="error">Error loading storage details: ${error.message}</p>`;
             }
         }
+    }
+
+    createStatsHTML(data) {
+        return `
+            <div class="stat-item">
+                <p>Total Items: ${data?.length || 0}</p>
+                <p>Last Updated: ${new Date().toLocaleTimeString()}</p>
+            </div>
+        `;
     }
 
     async resetStorage(path) {
@@ -102,12 +148,16 @@ export class StorageManager {
         try {
             const cleanPath = path.replace(/^\/api\//, '');
             const response = await fetch(`/api/admin/storage/${cleanPath}`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch storage data');
-            }
+            if (!response.ok) throw new Error('Failed to fetch storage data');
             const data = await response.json();
+            const resourceKey = `${cleanPath}s`;
             
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            // Export the entire array of items
+            const exportData = {
+                [resourceKey]: data[resourceKey] || []
+            };
+            
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -178,7 +228,12 @@ export class StorageManager {
         this.stopAutoUpdate();
         this.updateInterval = setInterval(() => {
             if (document.querySelector('.tab-btn[data-tab="storage"].active')) {
-                this.displayStorageInfo(routes);
+                document.querySelectorAll('.storage-details').forEach(element => {
+                    const path = element.id.replace('storage-', '').replace(/-/g, '/');
+                    const previousData = element.dataset.previousData ? 
+                        JSON.parse(element.dataset.previousData) : null;
+                    this.updateStorageDetails(path, previousData);
+                });
             }
         }, 5000);
     }

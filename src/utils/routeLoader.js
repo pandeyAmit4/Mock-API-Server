@@ -44,14 +44,7 @@ export async function loadRoutes(app, routesConfig) {
             try {
                 // Ensure path starts with /
                 const path = route.path.startsWith('/') ? route.path : `/${route.path}`;
-                console.log('\nProcessing route:', {
-                    path: path,
-                    method: route.method,
-                    persist: route.persist,
-                    hasResponse: !!route.response,
-                    hasSchema: !!route.schema
-                });
-                
+               
                 validateRouteConfig(route);
                 
                 const routeKey = `${route.method.toUpperCase()}:${path}`;
@@ -66,13 +59,6 @@ export async function loadRoutes(app, routesConfig) {
                 // Register route handler with normalized path
                 app[route.method.toLowerCase()](path, async (req, res) => {
                     try {
-                        console.log('Processing request:', {
-                            method: route.method,
-                            path: path,
-                            error: route.error,
-                            delay: route.delay
-                        });
-
                         // Handle error simulation
                         if (route.error && route.error.enabled) {
                             const probability = parseFloat(route.error.probability) || 25;

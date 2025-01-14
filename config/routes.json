@@ -1,5 +1,67 @@
 [
   {
+    "persist": true,
+    "validateRequest": false,
+    "path": "/api/emp",
+    "method": "GET",
+    "response": {
+      "emps": [
+        {
+          "id": "{{faker.string.uuid}}",
+          "name": "{{faker.commerce.productName}}",
+          "description": "{{faker.commerce.productDescription}}"
+        }
+      ]
+    },
+    "statusCode": 200
+  },
+  {
+    "persist": true,
+    "schema": null,
+    "validateRequest": false,
+    "path": "/api/emp/:id",
+    "method": "GET",
+    "response": {
+      "id": "{{faker.string.uuid}}",
+      "name": "{{faker.commerce.productName}}",
+      "description": "{{faker.commerce.productDescription}}"
+    },
+    "statusCode": 200
+  },
+  {
+    "persist": true,
+    "validateRequest": true,
+    "path": "/api/emp",
+    "method": "POST",
+    "response": {
+      "id": "{{faker.string.uuid}}",
+      "name": "{{faker.commerce.productName}}",
+      "description": "{{faker.commerce.productDescription}}"
+    },
+    "statusCode": 201
+  },
+  {
+    "persist": true,
+    "validateRequest": true,
+    "path": "/api/emp/:id",
+    "method": "PUT",
+    "response": {
+      "id": "{{faker.string.uuid}}",
+      "name": "{{faker.commerce.productName}}",
+      "description": "{{faker.commerce.productDescription}}"
+    },
+    "statusCode": 200
+  },
+  {
+    "persist": true,
+    "schema": null,
+    "validateRequest": false,
+    "path": "/api/emp/:id",
+    "method": "DELETE",
+    "response": null,
+    "statusCode": 204
+  },
+  {
     "path": "/api/users",
     "method": "GET",
     "response": {
@@ -13,9 +75,7 @@
       ]
     },
     "persist": true,
-    "statusCode": 200,
-    "delay": 1000,
-    "validateRequest": false
+    "statusCode": 200
   },
   {
     "path": "/api/products",
@@ -34,7 +94,7 @@
     "statusCode": 200
   },
   {
-    "path": "/api/blog-posts",
+    "path": "/api/blogPosts",
     "method": "GET",
     "response": {
       "posts": [
@@ -141,7 +201,7 @@
     "statusCode": 204
   },
   {
-    "path": "/api/blog-posts/:id",
+    "path": "/api/blogPosts/:id",
     "method": "GET",
     "response": {
       "id": "{{faker.string.uuid}}",
@@ -154,7 +214,7 @@
     "statusCode": 200
   },
   {
-    "path": "/api/blog-posts",
+    "path": "/api/blogPosts",
     "method": "POST",
     "response": {
       "id": "{{faker.string.uuid}}",
@@ -168,7 +228,7 @@
     "validateRequest": true
   },
   {
-    "path": "/api/blog-posts/:id",
+    "path": "/api/blogPosts/:id",
     "method": "PUT",
     "response": {
       "id": "{{faker.string.uuid}}",
@@ -182,7 +242,7 @@
     "validateRequest": true
   },
   {
-    "path": "/api/blog-posts/:id",
+    "path": "/api/blogPosts/:id",
     "method": "DELETE",
     "response": null,
     "persist": true,

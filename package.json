@@ -12,10 +12,13 @@
 		"postinstall": "npm run setup",
 		"start": "node src/cli.js start",
 		"dev": "nodemon src/cli.js start",
-		"test": "node src/tests/routes.test.js && node src/tests/plugins.test.js && node src/tests/openapi.test.js",
+		"test": "node src/tests/routes.test.js && node src/tests/plugins.test.js && node src/tests/openapi.test.js && node src/tests/storage.test.js && node src/tests/logger.test.js && node src/tests/versionControl.test.js",
 		"test:routes": "node src/tests/routes.test.js",
 		"test:plugins": "node src/tests/plugins.test.js",
 		"test:openapi": "node src/tests/openapi.test.js",
+		"test:storage": "node src/tests/storage.test.js",
+		"test:logger": "node src/tests/logger.test.js",
+		"test:version": "node src/tests/versionControl.test.js",
 		"test:watch": "nodemon --exec npm test"
 	},
 	"dependencies": {

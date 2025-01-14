@@ -24,6 +24,7 @@ export class RouteManager {
 		document.getElementById("saveRoutes").addEventListener("click", () => this.saveRoutes())
 		document.getElementById("addRoute").addEventListener("click", () => this.addRoute())
 		document.getElementById("loadSamples").addEventListener("click", () => this.loadSampleRoutes())
+		document.getElementById("deleteAllRoutes").addEventListener("click", () => this.deleteAllRoutes())
 
 		document.getElementById("refreshVersions")?.addEventListener("click", () => {
 			this.loadVersionHistory()
@@ -98,14 +99,19 @@ export class RouteManager {
 				...updatedRoute, // Apply updates
 				persist: true,
 				method: updatedRoute.method.toUpperCase(),
-				// Preserve error settings
-				error: updatedRoute.error || route.error,
-				// Preserve delay settings
-				delay: updatedRoute.delay || route.delay,
+				 // Only include error settings if enabled in the form
+				error: updatedRoute.error?.enabled ? updatedRoute.error : undefined,
+				// Only include delay if it's set in the form
+				delay: updatedRoute.delay || undefined,
 				// Handle schema validation
-				schema: updatedRoute.schema,
+				schema: updatedRoute.schema || undefined,
 				validateRequest: (updatedRoute.method === "POST" || updatedRoute.method === "PUT") && updatedRoute.schema != null,
 			}
+
+			// Clean up undefined properties
+			Object.keys(mergedRoute).forEach(key => 
+				mergedRoute[key] === undefined && delete mergedRoute[key]
+			);
 
 			console.log("Final merged route:", mergedRoute)
 			this.routes[index] = mergedRoute
@@ -121,8 +127,11 @@ export class RouteManager {
 		try {
 			const response = await fetch("/api/admin/routes")
 			if (!response.ok) throw new Error("Failed to load routes")
-			this.routes = await response.json()
+			const data = await response.json()
+			// Ensure we set this.routes to the array
+			this.routes = data.routes || []
 			this.displayRoutes()
+			this.updateRouteButtons()
 		} catch (error) {
 			console.error("Load error:", error)
 			showToast("Error loading routes: " + error.message, "error")
@@ -153,6 +162,7 @@ export class RouteManager {
 			if (result.success) {
 				showToast(`${result.count} sample routes loaded successfully`, "success")
 				await this.loadRoutes()
+				this.updateRouteButtons()
 			} else {
 				throw new Error(result.message || "Failed to load sample routes")
 			}
@@ -210,6 +220,7 @@ export class RouteManager {
 			showToast("Routes saved successfully", "success")
 			await this.loadRoutes()
 			this.hideUnsavedChanges()
+			this.updateRouteButtons()
 		} catch (error) {
 			console.error("Save error:", error)
 			showToast(error.message, "error")
@@ -374,12 +385,25 @@ export class RouteManager {
 		}
 
 		try {
-			// Use the response property from formData instead of template
-			const template = formData.response
+			// Extract operations from form data checkboxes
+			const template = formData.response || {}
 			const schema = formData.schema
 			const resourceName = path.split("/").pop()
 
-			const newRoutes = this.generateRoutes(path, resourceName, template, schema, formData)
+			// Access checkboxes directly to ensure we get boolean values
+			const operations = {
+				get: document.getElementById("opGet")?.checked || false,
+				post: document.getElementById("opPost")?.checked || false,
+				put: document.getElementById("opPut")?.checked || false,
+				delete: document.getElementById("opDelete")?.checked || false,
+			}
+
+			console.log("Operations from checkboxes:", operations)
+
+			const newRoutes = this.generateRoutes(path, resourceName, template, schema, {
+				...formData,
+				operations,
+			})
 
 			if (newRoutes.length === 0) {
 				showToast("No operations selected", "warning")
@@ -544,6 +568,43 @@ export class RouteManager {
 			showToast("Failed to export routes: " + error.message, "error")
 		}
 	}
+
+	updateRouteButtons() {
+		const loadSamplesBtn = document.getElementById("loadSamples")
+		const deleteAllBtn = document.getElementById("deleteAllRoutes")
+		
+		if (loadSamplesBtn) {
+			loadSamplesBtn.style.display = this.routes.length === 0 ? "inline-flex" : "none"
+		}
+		
+		if (deleteAllBtn) {
+			deleteAllBtn.style.display = this.routes.length > 0 ? "inline-flex" : "none"
+		}
+	}
+
+	async deleteAllRoutes() {
+		if (!confirm("Are you sure you want to delete all routes?")) {
+			return;
+		}
+
+		try {
+			this.routes = [];
+			await this.saveRoutes();
+			this.displayRoutes();
+			this.updateRouteButtons();
+			showToast("All routes deleted successfully", "success");
+		} catch (error) {
+			console.error("Delete all error:", error);
+			showToast("Failed to delete all routes: " + error.message, "error");
+		}
+	}
+
+	updateErrorProbability(index, probability) {
+		if (this.routes[index] && this.routes[index].error) {
+			this.routes[index].error.probability = parseInt(probability);
+			this.showUnsavedChanges();
+		}
+	}
 }
 
 function createRouteItem(route, index) {
@@ -579,10 +640,13 @@ function createRouteItem(route, index) {
                     <h4>Error Simulation</h4>
                     <div class="route-error-config">
                         <div class="error-probability">
-                            <span>Probability: ${route.error.probability}%</span>
-                            <input type="range" class="probability-slider" 
+                            <span class="probability-label">Probability: ${route.error.probability}%</span>
+                            <input type="range" 
+                                class="probability-slider" 
                                 value="${route.error.probability}" 
-                                min="0" max="100" disabled>
+                                min="0" 
+                                max="100" 
+                                oninput="routeManager.updateErrorProbability(${index}, this.value); this.previousElementSibling.textContent = 'Probability: ' + this.value + '%'">
                         </div>
                         <div>Status: ${route.error.status}</div>
                         <div>Message: ${route.error.message}</div>

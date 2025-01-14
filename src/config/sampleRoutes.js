@@ -32,7 +32,7 @@ export const sampleRoutes = [
         path: '/api/blog-posts',
         method: 'GET',
         response: {
-            posts: [{
+            'blog-posts': [{  // Changed from 'posts' to 'blog-posts'
                 id: '{{faker.string.uuid}}',
                 title: '{{faker.lorem.sentence}}',
                 content: '{{faker.lorem.paragraphs}}',
@@ -46,16 +46,20 @@ export const sampleRoutes = [
 ];
 
 // Create CRUD operations for each resource
-const resources = ['users', 'products', 'posts'];
+const resources = ['users', 'products', 'blog-posts']; // Use kebab-case for consistency
 const resourcePaths = {
-    users: '/api/users',
-    products: '/api/products',
-    posts: '/api/blog-posts'
-};
+    users: "/api/users",
+    products: "/api/products",
+    'blog-posts': "/api/blog-posts"  // Use kebab-case
+}
 
 resources.forEach(resource => {
     const basePath = resourcePaths[resource];
     const baseRoute = sampleRoutes.find(r => r.path === basePath);
+    if (!baseRoute) {
+        console.error(`No base route found for resource: ${resource}`);
+        return;
+    }
     const template = baseRoute.response[resource][0];
 
     // Add GET single item route

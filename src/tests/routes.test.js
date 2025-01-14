@@ -123,19 +123,23 @@ async function runTests() {
 
   test('Should reset storage to empty state', () => {
     StorageManager.add(testPath, { name: 'Test' });
-    StorageManager.reset(testPath);
+    StorageManager.reset(testPath, { [`${testPath.split('/').pop()}s`]: [] });
     const all = StorageManager.getAll(testPath);
-    assert.strictEqual(all.length, 0);
+    const items = all[`${testPath.split('/').pop()}s`] || [];
+    assert.strictEqual(items.length, 0);
   });
 
   test('Should preload data after reset', () => {
-    const initialData = [
-      { id: '1', name: 'Item 1' },
-      { id: '2', name: 'Item 2' }
-    ];
+    const resourceName = testPath.split('/').pop();
+    const initialData = {
+        [`${resourceName}s`]: [
+            { id: '1', name: 'Item 1' },
+            { id: '2', name: 'Item 2' }
+        ]
+    };
     StorageManager.reset(testPath, initialData);
     const all = StorageManager.getAll(testPath);
-    assert.strictEqual(all.length, 2);
+    assert.strictEqual(all[`${resourceName}s`].length, 2);
   });
 
   // 5. Error Simulation Tests

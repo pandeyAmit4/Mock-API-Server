@@ -37,53 +37,79 @@ class StorageManager {
     if (!path.startsWith('/api/')) {
       path = `/api${path.startsWith('/') ? path : `/${path}`}`;
     }
+    // Don't convert case in the path to maintain original format
     return path;
   }
 
   static getStoreName(path) {
     const parts = path.split('/');
-    const resource = parts[parts.length - 1];
-    // Ensure we have a valid resource name
-    return resource ? `${resource}s` : 'items';
+    const resource = parts[parts.length - 1].replace(/:.+/, '');
+    
+    // Convert both camelCase and kebab-case to lowercase plural
+    const normalized = resource
+      // Convert camelCase to kebab
+      .replace(/([a-z])([A-Z])/g, '$1-$2')
+      .toLowerCase();
+    
+    return normalized + 's';
+  }
+
+  static getCollectionName(path) {
+    const basePath = path.split(':')[0].replace(/\/$/, '');
+    const resource = basePath.split('/').pop();
+    
+    // Convert both camelCase and kebab-case to lowercase plural
+    const normalized = resource
+      .replace(/([a-z])([A-Z])/g, '$1-$2')
+      .toLowerCase();
+    
+    return normalized + 's';
   }
 
   static getStore(path) {
-    const normalizedPath = this.normalizePath(path);
-    const storeName = this.getStoreName(normalizedPath);
-    if (!this.storage.has(normalizedPath)) {
-      this.storage.set(normalizedPath, { [storeName]: [] });
-    }
-    return this.storage.get(normalizedPath);
+    const collectionName = this.getStoreName(path);
+    const store = this.storage.get(path) || { [collectionName]: [] };
+    this.storage.set(path, store);
+    return store;
   }
 
-  static add(path, data) {
+  static add(path, data, params = {}) {
     try {
-      const validation = this.validateData(path, data);
-      if (!validation.isValid) {
-        throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
-      }
+      // Resolve path with parameters for nested routes
+      const actualPath = params ? Object.entries(params).reduce(
+        (p, [key, value]) => p.replace(`:${key}`, value),
+        path
+      ) : path;
 
-      const store = this.getStore(path);
-      const storeName = this.getStoreName(path);
+      const store = this.getStore(actualPath);
+      const collectionName = this.getStoreName(actualPath);
       
-      // Ensure store array exists
-      if (!store[storeName]) {
-        store[storeName] = [];
-      }
+      const newItem = {
+        id: crypto.randomUUID(),
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
       
-      // Ensure ID is present
-      if (!data.id) {
-        data.id = crypto.randomUUID();
-      }
-      
-      // Add the new item
-      store[storeName].push(data);
-      logger.debug(`Added item to ${path}`, { id: data.id });
-      return data;
+      store[collectionName].push(newItem);
+      return newItem;
     } catch (error) {
       logger.error(`Error adding item to ${path}:`, error);
       throw error;
     }
+  }
+
+  static addBatch(path, items) {
+    const store = this.getStore(path);
+    const storeName = this.getStoreName(path);
+    const newItems = items.map(item => ({
+      id: crypto.randomUUID(),
+      ...item,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }));
+    store[storeName].push(...newItems);
+    return newItems;
   }
 
   static update(path, id, data) {
@@ -126,23 +152,10 @@ class StorageManager {
   }
 
   static getAll(path) {
-    try {
-      const normalizedPath = this.normalizePath(path);
-      console.log('Getting storage for:', normalizedPath);
-      const storeName = this.getStoreName(normalizedPath);
-      const store = this.getStore(normalizedPath);
-      
-      // Ensure the store has the correct structure
-      if (!store[storeName]) {
-        store[storeName] = [];
-      }
-      
-      // console.log('Storage data:', store);
-      return store;
-    } catch (error) {
-      console.error('Error getting storage:', error);
-      throw new Error(`Failed to get storage for ${path}: ${error.message}`);
-    }
+    const normalizedPath = this.normalizePath(path);
+    const storeName = this.getStoreName(normalizedPath);
+    const store = this.storage.get(normalizedPath) || { [storeName]: [] };
+    return store;
   }
 
   static getById(path, id) {
@@ -183,6 +196,31 @@ class StorageManager {
     this.storage.clear();
     schemas.clear();
     logger.info('Reset all storage');
+  }
+
+  static query(path, filter = {}, options = {}) {
+    const store = this.getStore(path);
+    const storeName = this.getStoreName(path);
+    let results = [...store[storeName]];
+
+    // Apply filters
+    if (Object.keys(filter).length > 0) {
+      results = results.filter(item => 
+        Object.entries(filter).every(([key, value]) => item[key] === value)
+      );
+    }
+
+    // Apply sorting
+    if (options.sort) {
+      const [field, direction] = Object.entries(options.sort)[0];
+      results.sort((a, b) => {
+        return direction === 'asc' ? 
+          (a[field] || 0) - (b[field] || 0) : 
+          (b[field] || 0) - (a[field] || 0);
+      });
+    }
+
+    return results;
   }
 }
 

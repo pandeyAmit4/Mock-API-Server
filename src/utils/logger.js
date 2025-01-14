@@ -40,18 +40,16 @@ class Logger {
 
         this.addLog(logEntry);
         
-        // Console output with colors
-        const colors = {
-            error: '\x1b[31m', // red
-            warn: '\x1b[33m',  // yellow
-            info: '\x1b[36m',  // cyan
-            debug: '\x1b[90m'  // gray
-        };
-        
-        console.log(
-            `${colors[level]}[${logEntry.timestamp}] ${level.toUpperCase()}: ${message}\x1b[0m`,
-            metadata
-        );
+        // Only log to console if it's not a test environment AND if metadata is not empty
+        if (process.env.NODE_ENV !== 'test' && Object.keys(metadata).length > 0) {
+            const colors = {
+                error: '\x1b[31m',
+                warn: '\x1b[33m',
+                info: '\x1b[36m',
+                debug: '\x1b[90m'
+            };
+            console.log(`${colors[level]}[${logEntry.timestamp}] ${level.toUpperCase()}: ${message}\x1b[0m`, metadata);
+        }
     }
 
     error(message, metadata = {}) {
@@ -84,7 +82,7 @@ class Logger {
             this.logs = this.logs.slice(0, this.maxLogs);
         }
 
-        console.log('New log entry:', log.method, log.url, log.status);  // Debug log
+        // Remove the debug console.log that's causing undefined outputs
     }
 
     getLogs(limit = 100) {

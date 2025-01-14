@@ -28,6 +28,25 @@ export function validateRouteConfig(route, checkSchema = false) {
         }
     }
 
+    // Add error configuration validation
+    if (route.error?.enabled) {
+        if (typeof route.error.probability !== 'number' || 
+            route.error.probability < 0 || 
+            route.error.probability > 100) {
+            throw new Error('Error probability must be between 0 and 100');
+        }
+        
+        if (typeof route.error.status !== 'number' || 
+            route.error.status < 400 || 
+            route.error.status > 599) {
+            throw new Error('Error status must be a valid HTTP error code (400-599)');
+        }
+
+        if (typeof route.error.message !== 'string' || !route.error.message) {
+            throw new Error('Error message must be a non-empty string');
+        }
+    }
+
     return true;
 }
 

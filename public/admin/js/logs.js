@@ -1,11 +1,18 @@
 import { showToast } from './toast.js';
 import { debounce } from './utils.js';
+import { DOMUpdater } from './utils/domUpdater.js';
 
 export class LogsManager {
     constructor() {
         this.logs = new Map();
         this.expandedStates = new Set();
         this.refreshInterval = null;
+        this.filters = {
+            status: 'all',
+            method: 'all',
+            time: 'all',
+            search: ''
+        };
     }
 
     init() {
@@ -26,6 +33,33 @@ export class LogsManager {
             collapseAll: document.getElementById('collapseAll'),
             refreshLogs: document.getElementById('refreshLogs')
         };
+
+        // Status filter
+        document.getElementById('statusFilter')?.addEventListener('change', (e) => {
+            this.filters.status = e.target.value;
+            this.applyFilters();
+        });
+
+        // Method filter
+        document.getElementById('logsMethodFilter')?.addEventListener('change', (e) => {
+            this.filters.method = e.target.value;
+            this.applyFilters();
+        });
+
+        // Time filter
+        document.getElementById('timeFilter')?.addEventListener('change', (e) => {
+            this.filters.time = e.target.value;
+            this.applyFilters();
+        });
+
+        // Search filter with debounce
+        document.getElementById('logsSearch')?.addEventListener('input', (e) => {
+            clearTimeout(this.filterTimeout);
+            this.filterTimeout = setTimeout(() => {
+                this.filters.search = e.target.value.toLowerCase();
+                this.applyFilters();
+            }, 300);
+        });
 
         // Immediate filtering for dropdown changes
         if (elements.statusFilter) {
@@ -69,6 +103,51 @@ export class LogsManager {
         }
     }
 
+    applyFilters() {
+        const logItems = document.querySelectorAll('.log-item');
+        
+        logItems.forEach(item => {
+            const status = parseInt(item.dataset.status);
+            const method = item.dataset.method;
+            const timestamp = parseInt(item.dataset.timestamp);
+            const searchContent = item.dataset.searchContent?.toLowerCase() || '';
+            
+            let visible = true;
+
+            // Status filter
+            if (this.filters.status !== 'all') {
+                if (this.filters.status === 'success' && status >= 400) visible = false;
+                if (this.filters.status === 'error' && status < 400) visible = false;
+            }
+
+            // Method filter
+            if (this.filters.method !== 'all' && method !== this.filters.method) {
+                visible = false;
+            }
+
+            // Time filter
+            if (this.filters.time !== 'all') {
+                const now = Date.now();
+                const timeFilters = {
+                    '5m': 5 * 60 * 1000,
+                    '15m': 15 * 60 * 1000,
+                    '1h': 60 * 60 * 1000,
+                    '24h': 24 * 60 * 60 * 1000
+                };
+                if (now - timestamp > timeFilters[this.filters.time]) {
+                    visible = false;
+                }
+            }
+
+            // Search filter
+            if (this.filters.search && !searchContent.includes(this.filters.search)) {
+                visible = false;
+            }
+
+            item.style.display = visible ? 'block' : 'none';
+        });
+    }
+
     async loadLogs() {
         try {
             const response = await fetch('/api/admin/logs');
@@ -82,13 +161,65 @@ export class LogsManager {
     }
 
     updateLogs(newLogs) {
-        // Clear old logs first to ensure we have the latest data
-        this.logs.clear();
-        newLogs.forEach(log => {
+        const logsList = document.getElementById('logsList');
+        if (!logsList) return;
+
+        const oldLogs = Array.from(this.logs.values());
+        const changes = DOMUpdater.calculateUpdates(oldLogs, newLogs, 'timestamp');
+
+        // Remove deleted logs
+        changes.removed.forEach(log => {
             const logId = this.getLogId(log);
+            const element = logsList.querySelector(`[data-log-id="${logId}"]`);
+            if (element) {
+                element.remove();
+                this.logs.delete(logId);
+            }
+        });
+
+        // Update modified and add new logs
+        changes.modified.concat(changes.added).forEach(log => {
+            const logId = this.getLogId(log);
+            const existingElement = logsList.querySelector(`[data-log-id="${logId}"]`);
+            
+            // Create new element with data attributes for filtering
+            const div = document.createElement('div');
+            div.className = 'log-item';
+            div.dataset.logId = logId;
+            div.dataset.status = log.status;
+            div.dataset.method = log.method;
+            div.dataset.timestamp = new Date(log.timestamp).getTime();
+            div.dataset.searchContent = JSON.stringify(log).toLowerCase();
+            
+            div.innerHTML = `
+                <div class="log-header" onclick="logManager.toggleLogDetails(this)">
+                    <span>${new Date(log.timestamp).toLocaleString()} - ${log.method} ${log.url}</span>
+                    <span class="log-status log-status-${log.status}">${log.status}</span>
+                </div>
+                <div class="log-details${this.expandedStates.has(logId) ? ' expanded' : ''}">
+                    <div class="log-meta">
+                        <span>Response Time: ${log.responseTime}ms</span>
+                        <span>IP: ${log.ip}</span>
+                    </div>
+                    <pre>${JSON.stringify(log, null, 2)}</pre>
+                </div>
+            `;
+
+            if (existingElement) {
+                existingElement.replaceWith(div);
+            } else {
+                logsList.insertBefore(div, logsList.firstChild);
+            }
             this.logs.set(logId, log);
         });
-        requestAnimationFrame(() => this.displayLogs()); // Use requestAnimationFrame for smoother updates
+
+        // Preserve scroll position
+        if (changes.added.length > 0) {
+            const currentScroll = logsList.scrollTop;
+            requestAnimationFrame(() => {
+                logsList.scrollTop = currentScroll;
+            });
+        }
     }
 
     getLogId(log) {
@@ -136,25 +267,6 @@ export class LogsManager {
         
         // Preserve scroll position
         logsList.scrollTop = currentScroll;
-    }
-
-    createLogEntry(log) {
-        const logId = this.getLogId(log);
-        return `
-            <div class="log-item" data-log-id="${logId}">
-                <div class="log-header" onclick="logManager.toggleLogDetails(this)">
-                    <span>${new Date(log.timestamp).toLocaleString()} - ${log.method} ${log.url}</span>
-                    <span class="log-status log-status-${log.status}">${log.status}</span>
-                </div>
-                <div class="log-details${this.expandedStates.has(logId) ? ' expanded' : ''}">
-                    <div class="log-meta">
-                        <span>Response Time: ${log.responseTime}ms</span>
-                        <span>IP: ${log.ip}</span>
-                    </div>
-                    <pre>${JSON.stringify(log, null, 2)}</pre>
-                </div>
-            </div>
-        `;
     }
 
     toggleLogDetails(header) {
@@ -242,15 +354,19 @@ export class LogsManager {
     }
 
     async refreshLogs() {
-        const currentScrollPosition = document.getElementById('logsList')?.scrollTop || 0;
-        await this.loadLogs();
-        requestAnimationFrame(() => {
-            const logsList = document.getElementById('logsList');
-            if (logsList) {
-                logsList.scrollTop = currentScrollPosition;
-            }
-        });
-        showToast('Logs refreshed', 'info');
+        try {
+            const response = await fetch('/api/admin/logs');
+            if (!response.ok) throw new Error('Failed to load logs');
+            const newLogs = await response.json();
+            
+            // Use the new efficient update method
+            this.updateLogs(newLogs);
+            
+            showToast('Logs refreshed', 'info');
+        } catch (error) {
+            console.error('Error refreshing logs:', error);
+            showToast('Error refreshing logs: ' + error.message, 'error');
+        }
     }
 
     createLoadingIndicator(button) {
