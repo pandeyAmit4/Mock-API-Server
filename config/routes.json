@@ -13,7 +13,9 @@
       ]
     },
     "persist": true,
-    "statusCode": 200
+    "statusCode": 200,
+    "delay": 1000,
+    "validateRequest": false
   },
   {
     "path": "/api/products",

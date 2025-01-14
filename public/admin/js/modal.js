@@ -404,37 +404,26 @@ export class ModalManager {
     }
 
     populateForm(route) {
+        // Base fields
         document.getElementById('routePath').value = route.path || '';
         
-        // Set method if in edit mode
-        if (this.editMode) {
-            document.getElementById('routeMethod').value = route.method || '';
-        }
-
-        // Handle response template
+        // Response template
         if (route.response) {
-            const responseStr = typeof route.response === 'string' ? 
-                route.response : 
-                JSON.stringify(route.response, null, 2);
-            document.getElementById('responseTemplate').value = responseStr;
-            
-            // Auto-generate schema if schema validation is enabled
-            if (document.getElementById('enableSchema').checked && !route.schema) {
-                const schema = this.generateSchemaFromResponse(route.response);
-                document.getElementById('schemaTemplate').value = JSON.stringify(schema, null, 2);
-            }
+            document.getElementById('responseTemplate').value = 
+                typeof route.response === 'object' ? 
+                JSON.stringify(route.response, null, 2) : route.response;
         }
 
-        // Handle schema
+        // Schema settings
         if (route.schema) {
             document.getElementById('enableSchema').checked = true;
             document.getElementById('schemaTemplate').disabled = false;
             document.getElementById('schemaTemplate').value = 
-                typeof route.schema === 'string' ? 
-                route.schema : 
-                JSON.stringify(route.schema, null, 2);
+                typeof route.schema === 'object' ? 
+                JSON.stringify(route.schema, null, 2) : route.schema;
         }
 
+        // Error settings
         if (route.error?.enabled) {
             document.getElementById('enableError').checked = true;
             document.getElementById('errorSettings').style.display = 'block';
@@ -443,10 +432,18 @@ export class ModalManager {
             document.getElementById('errorMessage').value = route.error.message || '';
         }
 
+        // Delay settings
         if (route.delay) {
             document.getElementById('enableDelay').checked = true;
             document.getElementById('delaySettings').style.display = 'block';
             document.getElementById('delayMs').value = route.delay;
+        }
+
+        // Method - should be readonly in edit mode
+        const methodInput = document.getElementById('routeMethod');
+        if (methodInput) {
+            methodInput.value = route.method;
+            methodInput.disabled = true;
         }
     }
 
@@ -523,18 +520,17 @@ export class ModalManager {
     getFormData() {
         try {
             const responseTemplate = document.getElementById('responseTemplate').value;
-            const response = responseTemplate ? JSON.parse(responseTemplate) : {};
-            const method = this.editMode ? 
-                document.getElementById('routeMethod').value.toUpperCase() :
-                this.getSelectedMethod();
-            
-            console.log('Building form data in', this.editMode ? 'edit' : 'create', 'mode');
+            let response;
+            try {
+                response = JSON.parse(responseTemplate);
+            } catch (e) {
+                response = responseTemplate;
+            }
 
-            // Base configuration that's common for both edit and create modes
             const formData = {
                 path: document.getElementById('routePath').value.trim(),
-                method: method,
-                response: response,
+                method: document.getElementById('routeMethod')?.value || this.getSelectedMethod(),
+                response,
                 persist: true
             };
 
@@ -542,13 +538,11 @@ export class ModalManager {
             if (document.getElementById('enableSchema').checked) {
                 const schemaValue = document.getElementById('schemaTemplate').value;
                 formData.schema = JSON.parse(schemaValue);
-                formData.validateRequest = (method === 'POST' || method === 'PUT');
+                formData.validateRequest = true;
             }
 
             // Error simulation settings
-            const errorEnabled = document.getElementById('enableError').checked;
-            if (errorEnabled) {
-                console.log('Adding error settings');
+            if (document.getElementById('enableError').checked) {
                 formData.error = {
                     enabled: true,
                     probability: parseInt(document.getElementById('errorProb').value) || 25,
@@ -558,23 +552,10 @@ export class ModalManager {
             }
 
             // Delay settings
-            const delayEnabled = document.getElementById('enableDelay').checked;
-            if (delayEnabled) {
-                console.log('Adding delay settings');
+            if (document.getElementById('enableDelay').checked) {
                 formData.delay = parseInt(document.getElementById('delayMs').value) || 1000;
             }
 
-            // Operations only in create mode
-            if (!this.editMode) {
-                formData.operations = {
-                    get: document.getElementById('opGet').checked,
-                    post: document.getElementById('opPost').checked,
-                    put: document.getElementById('opPut').checked,
-                    delete: document.getElementById('opDelete').checked
-                };
-            }
-
-            console.log('Final form data:', formData);
             return formData;
         } catch (error) {
             showToast('Invalid JSON in form data: ' + error.message, 'error');
